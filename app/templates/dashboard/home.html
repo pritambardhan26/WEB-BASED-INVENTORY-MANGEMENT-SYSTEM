@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}<i class="bi bi-grid-fill me-2 text-primary-ims"></i>Dashboard{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI cards -->
+<div class="kpi-grid" id="kpiGrid">
+  {% set kpis = [
+    ('total_employees','Total Employees','bi-people-fill','#2196F3'),
+    ('total_products','Total Products','bi-box-seam-fill','#E53935'),
+    ('total_suppliers','Suppliers','bi-truck-front-fill','#43A047'),
+    ('todays_sales',"Today's Sales",'bi-cash-coin','#FBC02D'),
+    ('low_stock_count','Low Stock','bi-exclamation-triangle-fill','#E67E22'),
+    ('inventory_value','Inventory Value','bi-bank','#8E44AD'),
+  ] %}
+  {% for key, label, icon, color in kpis %}
+  <div class="kpi-card" style="background:{{ color }}">
+    <div class="kpi-label"><i class="bi {{ icon }} me-1"></i>{{ label }}</div>
+    <div class="kpi-value" id="kpi_{{ key }}">—</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-4">
+  <!-- Sales chart -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header-ims">
+        <i class="bi bi-graph-up text-primary-ims"></i> Sales — Last 14 Days
+        <button onclick="loadSalesChart()" class="btn-ims btn-ghost-ims ms-auto" style="padding:4px 12px;font-size:.8rem">
+          <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+      </div>
+      <div style="padding:16px;height:280px">
+        <canvas id="salesChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Low stock alerts -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header-ims" style="color:#E67E22">
+        <i class="bi bi-exclamation-triangle-fill"></i> Low Stock Alerts
+      </div>
+      <div style="overflow-y:auto;max-height:280px">
+        <table class="ims-table" id="lowStockTable">
+          <thead>
+            <tr><th>Product</th><th>Qty</th><th>Reorder</th></tr>
+          </thead>
+          <tbody id="lowStockBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if current_user.role == 'Admin' %}
+  <!-- Online users -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header-ims">
+        <i class="bi bi-people-fill text-primary-ims"></i> User Online Status
+      </div>
+      <div style="overflow-x:auto">
+        <table class="ims-table" id="onlineTable">
+          <thead>
+            <tr><th>Username</th><th>Role</th><th>Status</th><th>Last Login</th></tr>
+          </thead>
+          <tbody id="onlineBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let salesChartInst = null;
+
+async function loadKPIs() {
+  const d = await apiCall('/api/kpis');
+  if (!d) return;
+  document.getElementById('kpi_total_employees').textContent = d.total_employees;
+  document.getElementById('kpi_total_products').textContent  = d.total_products;
+  document.getElementById('kpi_total_suppliers').textContent = d.total_suppliers;
+  document.getElementById('kpi_todays_sales').textContent    = fmt(d.todays_sales);
+  document.getElementById('kpi_low_stock_count').textContent = d.low_stock_count;
+  document.getElementById('kpi_inventory_value').textContent = fmt(d.inventory_value);
+}
+
+async function loadSalesChart() {
+  const d = await apiCall('/api/sales-chart');
+  if (!d) return;
+  const ctx = document.getElementById('salesChart').getContext('2d');
+  if (salesChartInst) salesChartInst.destroy();
+  salesChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: d.dates.map(x => x.slice(5)),
+      datasets: [{
+        label: 'Revenue (₹)',
+        data: d.totals,
+        borderColor: '#1ABC9C',
+        backgroundColor: 'rgba(26,188,156,.1)',
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#1ABC9C',
+        pointRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f0f0f0' },
+             ticks: { callback: v => '₹' + v.toLocaleString('en-IN') } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+async function loadLowStock() {
+  const d = await apiCall('/api/low-stock-alerts');
+  if (!d) return;
+  renderRows('lowStockBody', d.items, (r, i) => `
+    <td>${r.name}</td>
+    <td><span class="badge badge-low">${r.quantity}</span></td>
+    <td>${r.reorder_level}</td>
+  `);
+}
+
+{% if current_user.role == 'Admin' %}
+async function loadOnlineUsers() {
+  const d = await apiCall('/api/online-users');
+  if (!d) return;
+  renderRows('onlineBody', d.users, (u, i) => `
+    <td><strong>${u.username}</strong></td>
+    <td><span class="badge ${u.role==='Admin'?'badge-admin':'badge-employee'}">${u.role}</span></td>
+    <td>
+      <span style="display:inline-flex;align-items:center;gap:5px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${u.is_online?'#43A047':'#aaa'}"></span>
+        ${u.is_online ? '<strong style="color:#43A047">Online</strong>' : 'Offline'}
+      </span>
+    </td>
+    <td class="fw-mono" style="font-size:.8rem">${u.last_login || '—'}</td>
+  `);
+}
+{% endif %}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadKPIs();
+  loadSalesChart();
+  loadLowStock();
+  {% if current_user.role == 'Admin' %}loadOnlineUsers();{% endif %}
+  setInterval(loadKPIs, 30000);
+});
+</script>
+{% endblock %}

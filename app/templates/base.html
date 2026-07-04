@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="csrf-token" content="{{ csrf_token() }}"/>
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#1ABC9C"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="IMS"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-180.png"/>
+  <link rel="apple-touch-icon" sizes="152x152" href="/static/icons/icon-152.png"/>
+  <link rel="apple-touch-icon" sizes="144x144" href="/static/icons/icon-144.png"/>
+  <meta name="msapplication-TileImage" content="/static/icons/icon-144.png"/>
+  <meta name="msapplication-TileColor" content="#1A2035"/>
+
+  <title>{% block title %}IMS{% endblock %} — Lalbagh Enterprise</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet"/>
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <span class="brand-icon"><i class="bi bi-boxes"></i></span>
+    <span class="brand-text">IMS</span>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="{{ url_for('dashboard.home') }}"
+       class="nav-item {% if request.endpoint == 'dashboard.home' %}active{% endif %}">
+      <i class="bi bi-grid-fill"></i><span>Dashboard</span>
+    </a>
+    {% if current_user.role == 'Admin' %}
+    <a href="{{ url_for('employees.index') }}"
+       class="nav-item {% if 'employees' in request.endpoint %}active{% endif %}">
+      <i class="bi bi-people-fill"></i><span>Employees</span>
+    </a>
+    <a href="{{ url_for('suppliers.index') }}"
+       class="nav-item {% if 'suppliers' in request.endpoint %}active{% endif %}">
+      <i class="bi bi-truck-front-fill"></i><span>Suppliers</span>
+    </a>
+    {% endif %}
+    <a href="{{ url_for('products.index') }}"
+       class="nav-item {% if 'products' in request.endpoint %}active{% endif %}">
+      <i class="bi bi-box-seam-fill"></i><span>Products</span>
+    </a>
+    <a href="{{ url_for('sales.index') }}"
+       class="nav-item {% if 'sales' in request.endpoint %}active{% endif %}">
+      <i class="bi bi-cart-fill"></i><span>Sales</span>
+    </a>
+    <a href="{{ url_for('customers.index') }}"
+       class="nav-item {% if 'customers' in request.endpoint %}active{% endif %}">
+      <i class="bi bi-person-lines-fill"></i><span>Customers</span>
+    </a>
+    {% if current_user.role == 'Admin' %}
+    <a href="{{ url_for('reports.index') }}"
+       class="nav-item {% if 'reports' in request.endpoint %}active{% endif %}">
+      <i class="bi bi-bar-chart-fill"></i><span>Reports</span>
+    </a>
+    {% endif %}
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-chip">
+      <span class="user-avatar">{{ current_user.username[0]|upper }}</span>
+      <div>
+        <div class="user-name">{{ current_user.username }}</div>
+        <div class="user-role">{{ current_user.role }}</div>
+      </div>
+    </div>
+    <a href="{{ url_for('auth.logout') }}" class="logout-btn" title="Logout">
+      <i class="bi bi-box-arrow-right"></i>
+    </a>
+  </div>
+</aside>
+
+<div class="main-wrap">
+  <header class="topbar">
+    <button class="sidebar-toggle" id="sidebarToggle">
+      <i class="bi bi-list"></i>
+    </button>
+    <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+    <div class="topbar-right">
+      <span class="topbar-clock" id="topbarClock"></span>
+      <button id="pwaInstallBtn"
+        style="display:none;background:#1ABC9C;color:white;border:none;
+               border-radius:8px;padding:4px 10px;font-size:.8rem;cursor:pointer"
+        title="Install App">
+        <i class="bi bi-download"></i> Install App
+      </button>
+      {% if current_user.role == 'Admin' %}
+      <a href="{{ url_for('reports.index') }}" class="topbar-btn" title="Reports">
+        <i class="bi bi-bar-chart"></i>
+      </a>
+      {% endif %}
+      <a href="{{ url_for('auth.logout') }}" class="topbar-btn topbar-logout" title="Logout">
+        <i class="bi bi-power"></i>
+      </a>
+    </div>
+  </header>
+
+  <main class="page-body">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} alert-dismissible fade show mx-3 mt-3" role="alert">
+          {{ msg }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+
+  </main>
+</div>
+
+{% else %}
+
+  {% block auth_content %}{% endblock %}
+
+{% endif %}
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+<script>
+// ── PWA: Service Worker Registration ────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('/static/sw.js', { scope: '/' });
+      console.log('[PWA] Service Worker registered, scope:', reg.scope);
+
+      // Detect SW update available → show toast
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateToast();
+          }
+        });
+      });
+
+      // Reload page when new SW takes control
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) { refreshing = true; window.location.reload(); }
+      });
+
+    } catch (err) {
+      console.warn('[PWA] SW registration failed:', err);
+    }
+  });
+}
+
+// ── PWA: Install Prompt ──────────────────────────────────────────────────────
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const btn = document.getElementById('pwaInstallBtn');
+  if (btn) btn.style.display = 'inline-flex';
+});
+
+document.getElementById('pwaInstallBtn')?.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  console.log('[PWA] Install outcome:', outcome);
+  deferredPrompt = null;
+  const btn = document.getElementById('pwaInstallBtn');
+  if (btn) btn.style.display = 'none';
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  const btn = document.getElementById('pwaInstallBtn');
+  if (btn) btn.style.display = 'none';
+  console.log('[PWA] App installed successfully');
+});
+
+// ── PWA: Offline / Online detection ─────────────────────────────────────────
+function updateOnlineStatus() {
+  const isOnline = navigator.onLine;
+  if (!isOnline) {
+    showToast('warning', '<i class="bi bi-wifi-off me-2"></i>You are offline. Some features may be limited.');
+  }
+}
+window.addEventListener('offline', () =>
+  showToast('warning', '<i class="bi bi-wifi-off me-2"></i>Connection lost. Working offline.')
+);
+window.addEventListener('online', () =>
+  showToast('success', '<i class="bi bi-wifi me-2"></i>Back online!')
+);
+
+// ── Update available toast ───────────────────────────────────────────────────
+function showUpdateToast() {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const id = 'pwa-update-toast';
+  if (document.getElementById(id)) return;
+  const el = document.createElement('div');
+  el.id = id;
+  el.className = 'toast show align-items-center text-bg-info border-0';
+  el.setAttribute('role', 'alert');
+  el.innerHTML = `
+    <div class="d-flex">
+      <div class="toast-body">
+        <i class="bi bi-arrow-up-circle me-2"></i>
+        App update available.
+        <button class="btn btn-sm btn-light ms-2" onclick="location.reload()">Refresh</button>
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto"
+              data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>`;
+  container.appendChild(el);
+}
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

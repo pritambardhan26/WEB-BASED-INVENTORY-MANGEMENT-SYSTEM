@@ -1,0 +1,559 @@
+{% extends "base.html" %}
+{% block title %}Suppliers{% endblock %}
+{% block page_title %}<i class="bi bi-truck-front-fill me-2 text-primary-ims"></i>Suppliers{% endblock %}
+
+{% block content %}
+<div class="search-bar">
+  <input class="search-input" id="searchQ" placeholder="Search name / company / phone…" oninput="loadList()"/>
+  <button class="btn-ims btn-ghost-ims" onclick="resetSearch()"><i class="bi bi-x-lg"></i> Reset</button>
+  <button class="btn-ims btn-ghost-ims ms-auto" onclick="exportTableCSV('supTable','suppliers.csv')">
+    <i class="bi bi-download"></i> CSV
+  </button>
+  <button class="btn-ims btn-ghost-ims" onclick="openBulkImport()">
+    <i class="bi bi-file-earmark-arrow-up"></i> Bulk Import
+  </button>
+</div>
+
+<div class="card mb-4">
+  <div style="overflow-x:auto">
+    <table class="ims-table" id="supTable">
+      <thead>
+        <tr><th>ID</th><th>Name</th><th>Company</th><th>Phone</th><th>Email</th><th>Address</th></tr>
+      </thead>
+      <tbody id="supBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="form-section">
+  <div class="section-title">Add / Edit Supplier</div>
+  <div class="row g-3">
+    <div class="col-md-2">
+      <label class="form-label-ims">Supplier ID</label>
+      <div class="d-flex gap-1">
+        <input class="form-control-ims flex-fill" id="fSid" placeholder="ID"/>
+        <button class="btn-ims btn-ghost-ims" onclick="autoId()"><i class="bi bi-magic"></i></button>
+      </div>
+    </div>
+    <div class="col-md-3"><label class="form-label-ims">Name</label>
+      <input class="form-control-ims w-100" id="fSName"/></div>
+    <div class="col-md-3"><label class="form-label-ims">Company</label>
+      <input class="form-control-ims w-100" id="fCompany"/></div>
+    <div class="col-md-2"><label class="form-label-ims">Phone</label>
+      <input class="form-control-ims w-100" id="fSPhone"/></div>
+    <div class="col-md-2"><label class="form-label-ims">Email</label>
+      <input class="form-control-ims w-100" id="fSEmail" type="email"/></div>
+    <div class="col-12"><label class="form-label-ims">Address</label>
+      <input class="form-control-ims w-100" id="fAddress"/></div>
+  </div>
+  <div class="d-flex gap-2 mt-3 flex-wrap">
+    <button class="btn-ims btn-success-ims" onclick="saveSup()"><i class="bi bi-check-lg"></i> Save</button>
+    <button class="btn-ims btn-danger-ims"  onclick="deleteSup()"><i class="bi bi-trash"></i> Delete</button>
+    <button class="btn-ims btn-ghost-ims"   onclick="openCreatePO()"><i class="bi bi-cart-plus"></i> Create PO</button>
+    <button class="btn-ims btn-ghost-ims"   onclick="viewPurchase()"><i class="bi bi-receipt"></i> Purchase History</button>
+    <button class="btn-ims btn-ghost-ims"   onclick="viewPayments()"><i class="bi bi-cash"></i> Payments</button>
+    <button class="btn-ims btn-ghost-ims"   onclick="clearForm()"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+
+<!-- ══ Create PO Modal ══════════════════════════════════════ -->
+<div class="modal fade" id="createPOModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-cart-plus me-2"></i>Create Purchase Order</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- PO header -->
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <label class="form-label-ims">Supplier</label>
+            <input class="form-control-ims w-100" id="poSupplierLabel" readonly/>
+            <input type="hidden" id="poSupplierId"/>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label-ims">Order Date</label>
+            <input type="date" class="form-control-ims w-100" id="poDate"/>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label-ims">Notes (optional)</label>
+            <input class="form-control-ims w-100" id="poNotes" placeholder="e.g. Urgent restock"/>
+          </div>
+        </div>
+
+        <!-- Add item row -->
+        <div class="form-section mb-3" style="padding:12px 16px">
+          <div class="section-title mb-2">Add Product</div>
+          <div class="d-flex gap-2 align-items-end flex-wrap">
+            <div>
+              <label class="form-label-ims">Product ID</label>
+              <input class="form-control-ims" id="poItemPid" placeholder="e.g. P001"
+                     style="width:110px" onkeydown="if(event.key==='Enter')addPOItem()"/>
+            </div>
+            <div>
+              <label class="form-label-ims">Qty</label>
+              <input type="number" class="form-control-ims" id="poItemQty"
+                     value="1" min="1" style="width:80px"/>
+            </div>
+            <div>
+              <!-- FIX: Renamed label from "Unit Cost" to "Cost Price" -->
+              <label class="form-label-ims">Cost Price (₹)</label>
+              <input type="number" class="form-control-ims" id="poItemCost"
+                     value="0" min="0" step="0.01" style="width:130px"/>
+            </div>
+            <button class="btn-ims btn-ghost-ims" onclick="addPOItem()">
+              <i class="bi bi-plus-circle"></i> Add
+            </button>
+          </div>
+          <!-- FIX: Helper text to inform user cost price will be auto-filled -->
+          <small class="text-muted mt-1 d-block" style="font-size:.78rem">
+            <i class="bi bi-info-circle"></i>
+            Cost price is auto-filled from the product record when you enter a Product ID.
+          </small>
+        </div>
+
+        <!-- Items table -->
+        <div style="max-height:280px;overflow-y:auto;border:1px solid #eee;border-radius:6px">
+          <table class="ims-table" id="poItemsTable">
+            <thead>
+              <tr>
+                <!-- FIX: Renamed "Unit Cost" column header to "Cost Price" -->
+                <th>Product ID</th><th>Product Name</th>
+                <th>Qty</th><th>Cost Price</th><th>Line Total</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="poItemsBody">
+              <tr id="poEmptyRow">
+                <td colspan="6" class="text-center text-muted py-3" style="font-size:.88rem">
+                  No items added yet.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Grand total -->
+        <div class="d-flex justify-content-end align-items-center mt-3 gap-2">
+          <span class="text-muted" style="font-size:.88rem">Grand Total</span>
+          <strong style="font-size:1.15rem">₹<span id="poGrandTotal">0.00</span></strong>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ims btn-ghost-ims" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-ims btn-success-ims" onclick="submitPO()">
+          <i class="bi bi-check-lg"></i> Confirm &amp; Update Stock
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ Purchase History Modal ═══════════════════════════════ -->
+<div class="modal fade" id="purchaseModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-receipt me-2"></i>Purchase Order History</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0" style="max-height:520px;overflow-y:auto">
+        <div id="purchaseHistoryContent"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ Payments Modal ════════════════════════════════════════ -->
+<div class="modal fade" id="paymentsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-cash me-2"></i>Supplier Payments</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex gap-2 mb-3 flex-wrap">
+          <input type="number" id="pmtAmount" placeholder="Amount" class="form-control-ims" style="width:140px"/>
+          <select id="pmtStatus" class="form-control-ims" style="width:130px">
+            <option>Paid</option><option>Pending</option><option>Partial</option>
+          </select>
+          <input type="date" id="pmtDate" class="form-control-ims" style="width:160px"/>
+          <button class="btn-ims btn-success-ims" onclick="addPayment()"><i class="bi bi-plus"></i> Add</button>
+        </div>
+        <div style="max-height:300px;overflow-y:auto">
+          <table class="ims-table">
+            <thead><tr><th>#</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody id="paymentsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ Bulk Import Modal ═════════════════════════════════════ -->
+<div class="modal fade" id="bulkImportModal" tabindex="-1">
+  <div class="modal-dialog modal-md">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-file-earmark-arrow-up me-2"></i>Bulk Import Suppliers</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted" style="font-size:.88rem">
+          Upload an Excel file to add or update multiple suppliers at once.
+          Existing Supplier IDs will be <strong>updated</strong>; new IDs will be <strong>added</strong>.
+        </p>
+        <ol style="font-size:.88rem;color:#555;padding-left:1.2rem;line-height:2">
+          <li>Download the template to see the required columns.</li>
+          <li>Fill in your supplier data (one row per supplier).</li>
+          <li>Upload the filled file below.</li>
+        </ol>
+        <div class="d-flex gap-2 mb-3">
+          <button class="btn-ims btn-ghost-ims" onclick="downloadTemplate()">
+            <i class="bi bi-download"></i> Download Template
+          </button>
+        </div>
+        <label class="form-label-ims">Select Excel File (.xlsx / .xls)</label>
+        <input type="file" id="bulkFile" accept=".xlsx,.xls"
+               class="form-control-ims w-100" style="padding:6px"/>
+        <div id="bulkResult" class="mt-3"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ims btn-ghost-ims" data-bs-dismiss="modal">Close</button>
+        <button class="btn-ims btn-success-ims" onclick="runBulkImport()">
+          <i class="bi bi-upload"></i> Import
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+let curSid  = null;
+let poItems = [];   // line-item buffer for the PO being built
+
+// ── Supplier list ────────────────────────────────────────────
+async function loadList() {
+  const q = document.getElementById('searchQ').value;
+  const d = await apiCall(`/suppliers/api/list?q=${encodeURIComponent(q)}`);
+  if (!d) return;
+  renderRows('supBody', d.suppliers, (s) => `
+    <td class="fw-mono">${s.supplier_id}</td>
+    <td><strong>${s.name}</strong></td>
+    <td>${s.company}</td>
+    <td>${s.phone}</td>
+    <td>${s.email}</td>
+    <td style="font-size:.82rem">${s.address}</td>
+  `);
+  makeSortable('supTable');
+  initRowSelect('supTable', row => {
+    const c = row.querySelectorAll('td');
+    curSid = c[0].textContent;
+    document.getElementById('fSid').value     = c[0].textContent;
+    document.getElementById('fSName').value   = c[1].textContent;
+    document.getElementById('fCompany').value = c[2].textContent;
+    document.getElementById('fSPhone').value  = c[3].textContent;
+    document.getElementById('fSEmail').value  = c[4].textContent;
+    document.getElementById('fAddress').value = c[5].textContent;
+  });
+}
+
+async function autoId() {
+  const d = await apiCall('/suppliers/api/next-id');
+  if (d) document.getElementById('fSid').value = d.supplier_id;
+}
+
+async function saveSup() {
+  const d = await apiCall('/suppliers/api/save', 'POST', {
+    supplier_id: document.getElementById('fSid').value.trim(),
+    name:        document.getElementById('fSName').value.trim(),
+    company:     document.getElementById('fCompany').value.trim(),
+    phone:       document.getElementById('fSPhone').value.trim(),
+    email:       document.getElementById('fSEmail').value.trim(),
+    address:     document.getElementById('fAddress').value.trim(),
+  });
+  if (d) { showToast(d.message, d.success ? 'success' : 'danger'); if (d.success) { clearForm(); loadList(); } }
+}
+
+async function deleteSup() {
+  const sid = document.getElementById('fSid').value.trim();
+  if (!sid) return showToast('Select a supplier.', 'warning');
+  if (!confirm2(`Delete supplier ${sid}?`)) return;
+  const d = await apiCall(`/suppliers/api/delete/${sid}`, 'DELETE');
+  if (d) { showToast(d.message, d.success ? 'success' : 'danger'); clearForm(); loadList(); }
+}
+
+function clearForm() {
+  ['fSid','fSName','fCompany','fSPhone','fSEmail','fAddress']
+    .forEach(id => document.getElementById(id).value = '');
+  curSid = null;
+}
+
+function resetSearch() { document.getElementById('searchQ').value = ''; loadList(); }
+document.addEventListener('DOMContentLoaded', loadList);
+
+
+// ── Create PO ────────────────────────────────────────────────
+function openCreatePO() {
+  const sid     = document.getElementById('fSid').value.trim();
+  const company = document.getElementById('fCompany').value.trim();
+  if (!sid) return showToast('Select a supplier first.', 'warning');
+
+  document.getElementById('poSupplierId').value    = sid;
+  document.getElementById('poSupplierLabel').value = `${sid} — ${company}`;
+  document.getElementById('poDate').value          = new Date().toISOString().slice(0, 10);
+  document.getElementById('poNotes').value         = '';
+  document.getElementById('poItemPid').value       = '';
+  document.getElementById('poItemQty').value       = 1;
+  document.getElementById('poItemCost').value      = 0;
+  poItems = [];
+  renderPOItems();
+  new bootstrap.Modal(document.getElementById('createPOModal')).show();
+}
+
+async function addPOItem() {
+  const pid  = document.getElementById('poItemPid').value.trim().toUpperCase();
+  const qty  = parseInt(document.getElementById('poItemQty').value)   || 1;
+
+  if (!pid) return showToast('Enter a Product ID.', 'warning');
+  if (qty  < 1) return showToast('Quantity must be at least 1.', 'warning');
+
+  // Check for duplicate in current PO
+  if (poItems.find(i => i.product_id === pid)) {
+    return showToast(`${pid} is already in the list — edit the quantity instead.`, 'warning');
+  }
+
+  // Fetch product details
+  const prod = await apiCall(`/products/api/get/${pid}`);
+  if (!prod || !prod.product_id) return showToast(`Product '${pid}' not found.`, 'danger');
+
+  // FIX: Auto-fill cost price from the product record.
+  // If user has already typed a custom cost, keep theirs; otherwise use product's cost_price.
+  const existingCostInput = parseFloat(document.getElementById('poItemCost').value) || 0;
+  const cost = existingCostInput > 0 ? existingCostInput : (prod.cost_price || 0);
+  document.getElementById('poItemCost').value = cost.toFixed(2);
+
+  // Re-read cost after potential auto-fill
+  const finalCost = parseFloat(document.getElementById('poItemCost').value) || 0;
+
+  poItems.push({
+    product_id:   pid,
+    product_name: prod.name,
+    quantity:     qty,
+    unit_cost:    finalCost,
+  });
+
+  document.getElementById('poItemPid').value  = '';
+  document.getElementById('poItemQty').value  = 1;
+  document.getElementById('poItemCost').value = 0;
+  document.getElementById('poItemPid').focus();
+  renderPOItems();
+}
+
+function removePOItem(idx) {
+  poItems.splice(idx, 1);
+  renderPOItems();
+}
+
+function renderPOItems() {
+  const tbody = document.getElementById('poItemsBody');
+  if (!poItems.length) {
+    tbody.innerHTML = `<tr id="poEmptyRow">
+      <td colspan="6" class="text-center text-muted py-3" style="font-size:.88rem">
+        No items added yet.
+      </td></tr>`;
+    document.getElementById('poGrandTotal').textContent = '0.00';
+    return;
+  }
+
+  let grand = 0;
+  tbody.innerHTML = poItems.map((it, i) => {
+    const lt = it.quantity * it.unit_cost;
+    grand += lt;
+    return `<tr>
+      <td class="fw-mono">${it.product_id}</td>
+      <td>${it.product_name}</td>
+      <td>${it.quantity}</td>
+      <!-- FIX: Column header renamed to "Cost Price" in thead above; value unchanged -->
+      <td class="fw-mono">₹${it.unit_cost.toFixed(2)}</td>
+      <td class="fw-mono">₹${lt.toFixed(2)}</td>
+      <td>
+        <button class="btn-ims btn-danger-ims" style="padding:2px 8px"
+                onclick="removePOItem(${i})">
+          <i class="bi bi-x"></i>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('poGrandTotal').textContent = grand.toFixed(2);
+}
+
+async function submitPO() {
+  if (!poItems.length) return showToast('Add at least one product.', 'warning');
+
+  const payload = {
+    supplier_id: document.getElementById('poSupplierId').value,
+    order_date:  document.getElementById('poDate').value,
+    notes:       document.getElementById('poNotes').value.trim(),
+    items: poItems.map(it => ({
+      product_id: it.product_id,
+      quantity:   it.quantity,
+      unit_cost:  it.unit_cost,
+    })),
+  };
+
+  const d = await apiCall('/suppliers/api/create-po', 'POST', payload);
+  if (d) {
+    showToast(d.message, d.success ? 'success' : 'danger');
+    if (d.success) {
+      bootstrap.Modal.getInstance(
+        document.getElementById('createPOModal')).hide();
+    }
+  }
+}
+
+
+// ── Purchase History (with item breakdown) ───────────────────
+async function viewPurchase() {
+  const sid = document.getElementById('fSid').value.trim();
+  if (!sid) return showToast('Select a supplier.', 'warning');
+
+  const d = await apiCall(`/suppliers/api/purchase-history/${sid}`);
+  if (!d) return;
+
+  const container = document.getElementById('purchaseHistoryContent');
+
+  if (!d.orders.length) {
+    container.innerHTML = `
+      <p class="text-center text-muted py-4">
+        <i class="bi bi-inbox me-2"></i>No purchase orders for this supplier yet.
+      </p>`;
+  } else {
+    container.innerHTML = d.orders.map(o => `
+      <div style="border-bottom:1px solid var(--border,#eee);padding:14px 18px">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+          <strong>PO #${o.po_id}</strong>
+          <span class="text-muted" style="font-size:.82rem">${o.order_date}</span>
+          <span class="fw-mono" style="color:var(--success-ims,#198754)">
+            ₹${Number(o.total_amount).toFixed(2)}
+          </span>
+          ${o.notes ? `<span class="text-muted" style="font-size:.78rem">📝 ${o.notes}</span>` : ''}
+        </div>
+        <table class="ims-table" style="font-size:.82rem">
+          <thead>
+            <!-- FIX: Renamed "Unit Cost" to "Cost Price" in purchase history view -->
+            <tr><th>Product</th><th>Qty</th><th>Cost Price</th><th>Line Total</th></tr>
+          </thead>
+          <tbody>
+            ${(o.items || []).map(it => `
+              <tr>
+                <td>
+                  <span class="fw-mono" style="font-size:.78rem;color:#888">${it.product_id}</span>
+                  ${it.product_name}
+                </td>
+                <td>${it.quantity}</td>
+                <td class="fw-mono">₹${Number(it.unit_cost).toFixed(2)}</td>
+                <td class="fw-mono">₹${Number(it.line_total).toFixed(2)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `).join('');
+  }
+
+  new bootstrap.Modal(document.getElementById('purchaseModal')).show();
+}
+
+
+// ── Payments ─────────────────────────────────────────────────
+async function viewPayments() {
+  const sid = document.getElementById('fSid').value.trim();
+  if (!sid) return showToast('Select a supplier.', 'warning');
+  curSid = sid;
+  document.getElementById('pmtDate').value = new Date().toISOString().slice(0, 10);
+  await loadPaymentsList();
+  new bootstrap.Modal(document.getElementById('paymentsModal')).show();
+}
+
+async function loadPaymentsList() {
+  const d = await apiCall(`/suppliers/api/payments/${curSid}`);
+  if (!d) return;
+  renderRows('paymentsBody', d.payments, (p) => `
+    <td>${p.payment_id}</td>
+    <td>${p.payment_date}</td>
+    <td class="fw-mono">${fmt(p.amount)}</td>
+    <td><span class="badge ${p.status==='Paid'?'badge-ok':p.status==='Pending'?'badge-low':'badge-employee'}">
+      ${p.status}</span></td>
+  `);
+}
+
+async function addPayment() {
+  if (!curSid) return;
+  const d = await apiCall('/suppliers/api/add-payment', 'POST', {
+    supplier_id:  curSid,
+    amount:       parseFloat(document.getElementById('pmtAmount').value) || 0,
+    status:       document.getElementById('pmtStatus').value,
+    payment_date: document.getElementById('pmtDate').value,
+  });
+  if (d) { showToast(d.message, d.success ? 'success' : 'danger'); loadPaymentsList(); }
+}
+
+
+// ── Bulk Import ───────────────────────────────────────────────
+function openBulkImport() {
+  document.getElementById('bulkFile').value    = '';
+  document.getElementById('bulkResult').innerHTML = '';
+  new bootstrap.Modal(document.getElementById('bulkImportModal')).show();
+}
+
+function downloadTemplate() {
+  window.location.href = '/suppliers/api/bulk-import-template';
+}
+
+async function runBulkImport() {
+  const fileInput = document.getElementById('bulkFile');
+  if (!fileInput.files.length) return showToast('Please select an Excel file first.', 'warning');
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+
+  document.getElementById('bulkResult').innerHTML =
+    '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-success"></div> Importing…</div>';
+
+  try {
+    const resp = await fetch('/suppliers/api/bulk-import', { method: 'POST', body: formData });
+    const d    = await resp.json();
+    if (d.success) {
+      let html = `<div class="alert alert-success py-2 mb-2">
+        <strong>Done!</strong> ${d.added} added, ${d.updated} updated, ${d.errors} errors.
+      </div>`;
+      if (d.error_list?.length) {
+        html += `<div class="alert alert-warning py-2" style="font-size:.82rem">
+          <strong>Row errors:</strong><br>${d.error_list.join('<br>')}
+        </div>`;
+      }
+      document.getElementById('bulkResult').innerHTML = html;
+      loadList();
+    } else {
+      document.getElementById('bulkResult').innerHTML =
+        `<div class="alert alert-danger py-2">${d.message}</div>`;
+    }
+  } catch (e) {
+    document.getElementById('bulkResult').innerHTML =
+      `<div class="alert alert-danger py-2">Network error: ${e.message}</div>`;
+  }
+}
+</script>
+{% endblock %}

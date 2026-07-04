@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+*.db
+*.sqlite3
+instance/
+.venv/
+venv/
+env/
+invoices/*.pdf
+uploads/*
+!uploads/.gitkeep
+invoices/.gitkeep
+*.log
+.DS_Store

@@ -1,0 +1,573 @@
+{% extends "base.html" %}
+{% block title %}Sign In — IMS{% endblock %}
+{% block auth_content %}
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;}
+
+/* ─── page shell ─────────────────────────────────────── */
+.lp{
+  position:fixed;inset:0;
+  display:flex;
+  font-family:'DM Sans',sans-serif;
+  background:#0b1120;
+}
+
+/* ─── LEFT panel ─────────────────────────────────────── */
+.lp-l{
+  width:52%;
+  position:relative;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:48px;
+  background:#0b1120;
+}
+
+/* layered geometric background */
+.lp-l-bg{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(29,184,90,0.13) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 85% 80%, rgba(26,58,107,0.5) 0%, transparent 55%),
+    linear-gradient(160deg, #0b1120 0%, #0d1a30 40%, #091a14 100%);
+}
+
+/* grid dot overlay */
+.lp-l-bg::before{
+  content:'';
+  position:absolute;inset:0;
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px);
+  background-size:32px 32px;
+}
+
+/* diagonal accent stripe */
+.lp-l-bg::after{
+  content:'';
+  position:absolute;
+  top:-10%;left:-5%;
+  width:55%;height:120%;
+  background:linear-gradient(135deg,rgba(29,184,90,0.06) 0%,transparent 60%);
+  transform:skewX(-8deg);
+  pointer-events:none;
+}
+
+/* glowing ring behind logo */
+.lp-glow{
+  position:absolute;
+  width:340px;height:340px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(29,184,90,0.10) 0%, transparent 70%);
+  pointer-events:none;
+}
+
+.lp-l-inner{
+  position:relative;z-index:2;
+  display:flex;flex-direction:column;
+  align-items:center;
+  gap:0;
+  width:100%;
+  max-width:460px;
+}
+
+/* logo */
+.lp-logo{
+  width:110px;height:110px;
+  margin-bottom:28px;
+  filter:drop-shadow(0 8px 32px rgba(29,184,90,0.35));
+  animation:logoUp .8s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes logoUp{
+  from{opacity:0;transform:translateY(24px);}
+  to  {opacity:1;transform:translateY(0);}
+}
+
+/* headline */
+.lp-headline{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:clamp(1.6rem,3vw,2.2rem);
+  font-weight:800;
+  color:#ffffff;
+  letter-spacing:-0.02em;
+  line-height:1.15;
+  text-align:center;
+  margin-bottom:10px;
+  animation:fadeUp .8s .15s cubic-bezier(.22,1,.36,1) both;
+}
+.lp-headline em{
+  font-style:normal;
+  background:linear-gradient(90deg,#1db85a,#34d472);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+
+.lp-sub{
+  font-size:.88rem;
+  color:rgba(255,255,255,.38);
+  text-align:center;
+  letter-spacing:.04em;
+  margin-bottom:40px;
+  animation:fadeUp .8s .25s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes fadeUp{
+  from{opacity:0;transform:translateY(12px);}
+  to  {opacity:1;transform:translateY(0);}
+}
+
+/* phone card */
+.lp-phone-wrap{
+  position:relative;
+  animation:fadeUp .8s .35s cubic-bezier(.22,1,.36,1) both;
+}
+.lp-phone-wrap::before{
+  content:'';
+  position:absolute;
+  inset:-2px;
+  border-radius:26px;
+  background:linear-gradient(140deg,rgba(29,184,90,0.5),rgba(26,58,107,0.3),transparent);
+  z-index:0;
+}
+.lp-phone{
+  position:relative;z-index:1;
+  width:min(220px,30vw);
+  height:auto;
+  border-radius:24px;
+  display:block;
+  box-shadow:0 40px 80px rgba(0,0,0,.6);
+}
+
+/* stats row */
+.lp-stats{
+  display:flex;gap:28px;
+  margin-top:36px;
+  animation:fadeUp .8s .45s cubic-bezier(.22,1,.36,1) both;
+}
+.lp-stat{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:14px 22px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:14px;
+}
+.lp-stat-n{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:1.3rem;font-weight:800;
+  color:#34d472;
+  letter-spacing:-0.02em;
+}
+.lp-stat-l{
+  font-size:.7rem;
+  color:rgba(255,255,255,.35);
+  text-transform:uppercase;letter-spacing:.1em;
+}
+
+/* bottom tag */
+.lp-tag{
+  position:absolute;bottom:24px;
+  font-size:.7rem;
+  color:rgba(255,255,255,.18);
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+
+/* ─── RIGHT panel ────────────────────────────────────── */
+.lp-r{
+  flex:1;
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#ffffff;
+  padding:40px 48px;
+  overflow-y:auto;
+}
+
+/* top-right teal accent corner */
+.lp-r::before{
+  content:'';
+  position:absolute;top:0;right:0;
+  width:0;height:0;
+  border-style:solid;
+  border-width:0 80px 80px 0;
+  border-color:transparent #f0fdf8 transparent transparent;
+  pointer-events:none;
+}
+
+/* subtle grid on white side */
+.lp-r::after{
+  content:'';
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(0,0,0,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,0,0,.025) 1px,transparent 1px);
+  background-size:40px 40px;
+  pointer-events:none;
+}
+
+.lp-form-wrap{
+  position:relative;z-index:1;
+  width:100%;max-width:380px;
+  animation:slideIn .6s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes slideIn{
+  from{opacity:0;transform:translateX(20px);}
+  to  {opacity:1;transform:translateX(0);}
+}
+
+/* form header */
+.lp-form-eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  background:#f0fdf8;
+  border:1px solid #bbf7d0;
+  border-radius:999px;
+  padding:5px 12px;
+  font-size:.72rem;
+  font-weight:600;
+  color:#16a34a;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  margin-bottom:18px;
+}
+.lp-form-eyebrow span{
+  width:6px;height:6px;
+  background:#22c55e;
+  border-radius:50%;
+  animation:pulse 2s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.5);}
+  50%     {box-shadow:0 0 0 5px rgba(34,197,94,0);}
+}
+
+.lp-form-title{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:1.9rem;font-weight:800;
+  color:#0f172a;
+  letter-spacing:-0.03em;
+  line-height:1.15;
+  margin-bottom:6px;
+}
+.lp-form-title span{color:#1db85a;}
+
+.lp-form-desc{
+  font-size:.85rem;
+  color:#94a3b8;
+  margin-bottom:30px;
+  font-weight:400;
+}
+
+/* divider */
+.lp-divider{
+  height:1px;
+  background:linear-gradient(90deg,transparent,#e2e8f0,transparent);
+  margin:0 0 26px;
+}
+
+/* flash alerts */
+.lp-flash{
+  display:flex;align-items:flex-start;gap:10px;
+  border-radius:10px;
+  padding:11px 14px;
+  font-size:.83rem;
+  margin-bottom:18px;
+  border:1px solid;
+  font-weight:500;
+}
+.lp-flash i{margin-top:1px;flex-shrink:0;}
+.lp-flash.danger {background:#fef2f2;color:#b91c1c;border-color:#fecaca;}
+.lp-flash.success{background:#f0fdf4;color:#166534;border-color:#bbf7d0;}
+.lp-flash.info   {background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;}
+.lp-flash.warning{background:#fffbeb;color:#92400e;border-color:#fde68a;}
+
+/* label */
+.lp-label{
+  display:flex;align-items:center;gap:6px;
+  font-size:.72rem;font-weight:700;
+  color:#64748b;
+  text-transform:uppercase;letter-spacing:.1em;
+  margin-bottom:8px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+}
+.lp-label i{font-size:.82rem;color:#94a3b8;}
+
+/* field group */
+.lp-field{margin-bottom:18px;}
+
+/* inputs */
+.lp-input,.lp-select{
+  width:100%;
+  border:1.5px solid #e2e8f0;
+  border-radius:10px;
+  padding:12px 15px;
+  font-family:'DM Sans',sans-serif;
+  font-size:.9rem;
+  color:#0f172a;
+  background:#f8fafc;
+  outline:none;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+  appearance:none;-webkit-appearance:none;
+}
+.lp-input:focus,.lp-select:focus{
+  border-color:#1db85a;
+  background:#fff;
+  box-shadow:0 0 0 3px rgba(29,184,90,.12);
+}
+.lp-input:hover:not(:focus),
+.lp-select:hover:not(:focus){border-color:#cbd5e1;}
+.lp-input::placeholder{color:#cbd5e1;}
+
+/* select arrow */
+.lp-sel-wrap{position:relative;}
+.lp-sel-wrap::after{
+  content:'';
+  position:absolute;right:14px;top:50%;
+  transform:translateY(-50%);
+  width:0;height:0;
+  border:5px solid transparent;
+  border-top:6px solid #94a3b8;
+  pointer-events:none;
+}
+
+/* password */
+.lp-pwd{position:relative;}
+.lp-pwd .lp-input{padding-right:46px;}
+.lp-eye{
+  position:absolute;right:13px;top:50%;
+  transform:translateY(-50%);
+  background:none;border:none;
+  cursor:pointer;color:#94a3b8;
+  font-size:1rem;padding:4px;
+  display:flex;align-items:center;
+  transition:color .2s;
+}
+.lp-eye:hover{color:#1db85a;}
+
+/* submit */
+.lp-btn{
+  width:100%;
+  background:linear-gradient(135deg,#1db85a 0%,#16a34a 100%);
+  color:#fff;border:none;
+  border-radius:10px;
+  padding:13px 20px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:.88rem;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  position:relative;overflow:hidden;
+  transition:transform .2s,box-shadow .2s;
+  box-shadow:0 4px 20px rgba(29,184,90,.35);
+  margin-top:4px;
+}
+.lp-btn::after{
+  content:'';
+  position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.18) 50%,transparent 100%);
+  transform:translateX(-100%);
+  transition:transform .5s;
+}
+.lp-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(29,184,90,.48);}
+.lp-btn:hover::after{transform:translateX(100%);}
+.lp-btn:active{transform:translateY(0);}
+
+/* forgot */
+.lp-forgot{
+  display:block;text-align:center;
+  margin-top:16px;
+  font-size:.82rem;font-weight:500;
+  color:#94a3b8;
+  text-decoration:none;
+  transition:color .2s;
+  letter-spacing:.01em;
+}
+.lp-forgot:hover{color:#1db85a;}
+
+/* footer */
+.lp-footer{
+  position:absolute;bottom:20px;left:0;right:0;
+  text-align:center;
+  font-size:.68rem;
+  color:#cbd5e1;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  pointer-events:none;
+}
+
+/* ─── responsive ─────────────────────────────────────── */
+@media(max-width:860px){
+  html,body{overflow:auto;}
+  .lp{position:relative;flex-direction:column;min-height:100vh;}
+  .lp-l{width:100%;min-height:300px;padding:36px 24px;}
+  .lp-phone{width:130px;}
+  .lp-stats{gap:12px;}
+  .lp-stat{padding:10px 14px;}
+  .lp-r{padding:40px 24px 70px;}
+  .lp-form-wrap{max-width:100%;}
+}
+</style>
+
+<div class="lp">
+
+  <!-- ══════ LEFT ══════ -->
+  <div class="lp-l">
+    <div class="lp-l-bg"></div>
+    <div class="lp-glow"></div>
+
+    <div class="lp-l-inner">
+
+      <!-- IMS SVG Logo inline -->
+      <svg class="lp-logo" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="b1" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stop-color="#1db85a"/><stop offset="100%" stop-color="#34d472"/>
+          </linearGradient>
+          <linearGradient id="b2" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stop-color="#18a850"/><stop offset="100%" stop-color="#2ecb68"/>
+          </linearGradient>
+          <linearGradient id="b3" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stop-color="#13973f"/><stop offset="100%" stop-color="#25be5c"/>
+          </linearGradient>
+          <linearGradient id="ibg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0d2245"/><stop offset="100%" stop-color="#0a1628"/>
+          </linearGradient>
+        </defs>
+        <rect width="400" height="400" rx="48" fill="#07101e"/>
+        <rect width="400" height="400" rx="48" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1.5"/>
+        <rect x="98" y="52" width="204" height="204" rx="40" fill="url(#ibg)"/>
+        <rect x="98" y="52" width="204" height="204" rx="40" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="1.5"/>
+        <path d="M128 128L128 194Q128 208 142 208L214 208Q224 208 226 197L238 150Q241 139 229 139L145 139"
+              fill="none" stroke="#c8ddf5" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="152" cy="223" r="10" fill="#34d472"/>
+        <circle cx="204" cy="223" r="10" fill="#34d472"/>
+        <rect x="155" y="175" width="14" height="25" rx="3.5" fill="url(#b1)"/>
+        <rect x="175" y="163" width="14" height="37" rx="3.5" fill="url(#b2)"/>
+        <rect x="195" y="149" width="14" height="51" rx="3.5" fill="url(#b3)"/>
+        <polyline points="162,183 182,170 202,156 226,134" fill="none" stroke="#c8ddf5" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <polygon points="226,134 214,133 223,143" fill="#c8ddf5"/>
+        <text x="200" y="308" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-weight="800" font-size="72" letter-spacing="14" fill="#e8f4ff">IMS</text>
+        <rect x="118" y="320" width="164" height="3" rx="1.5" fill="#34d472" opacity="0.6"/>
+        <text x="200" y="358" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-weight="400" font-size="11" letter-spacing="4" fill="#3a6090">INVENTORY MANAGEMENT</text>
+      </svg>
+
+      <div class="lp-headline">Smart <em>Inventory</em><br>Control Platform</div>
+      <div class="lp-sub">Real-time tracking · Analytics · Forecasting</div>
+
+      <!-- phone mockup with gradient border -->
+      <div class="lp-phone-wrap">
+        <img src="{{ url_for('static', filename='css/logo2.jpg') }}"
+             alt="IMS App" class="lp-phone"/>
+      </div>
+
+      <!-- stat pills -->
+      <div class="lp-stats">
+        <div class="lp-stat">
+          <span class="lp-stat-n">99.9%</span>
+          <span class="lp-stat-l">Uptime</span>
+        </div>
+        <div class="lp-stat">
+          <span class="lp-stat-n">Real-time</span>
+          <span class="lp-stat-l">Stock sync</span>
+        </div>
+        <div class="lp-stat">
+          <span class="lp-stat-n">Secure</span>
+          <span class="lp-stat-l">Encrypted</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="lp-tag">IMS · Inventory Management System</div>
+  </div>
+
+  <!-- ══════ RIGHT ══════ -->
+  <div class="lp-r">
+    <div class="lp-form-wrap">
+
+      <!-- eyebrow -->
+      <div class="lp-form-eyebrow">
+        <span></span> Secure Access Portal
+      </div>
+
+      <div class="lp-form-title">Sign in to<br><span>your account</span></div>
+      <div class="lp-form-desc">Enter your credentials to access the dashboard</div>
+
+      <div class="lp-divider"></div>
+
+      <!-- Flash messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="lp-flash {{ cat }}">
+          <i class="bi bi-{% if cat == 'danger' %}exclamation-circle{% elif cat == 'success' %}check-circle{% elif cat == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+          {{ msg }}
+        </div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('auth.login') }}" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+        <!-- Username -->
+        <div class="lp-field">
+          <div class="lp-label">
+            <i class="bi bi-person"></i> Username
+          </div>
+          <div class="lp-sel-wrap">
+            <select name="username" id="username" class="lp-select" required>
+              <option value="">— Select your account —</option>
+              {% for u in usernames %}
+              <option value="{{ u }}">{{ u }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Password -->
+        <div class="lp-field">
+          <div class="lp-label">
+            <i class="bi bi-lock"></i> Password
+          </div>
+          <div class="lp-pwd">
+            <input type="password" name="password" id="pwdInput"
+                   class="lp-input" placeholder="Enter your password" required/>
+            <button type="button" id="pwdToggle" class="lp-eye" aria-label="Toggle password">
+              <i class="bi bi-eye" id="pwdIcon"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sign In -->
+        <button type="submit" class="lp-btn">
+          <i class="bi bi-shield-lock"></i>
+          Sign In Securely
+        </button>
+
+        <a href="{{ url_for('auth.forgot_password') }}" class="lp-forgot">
+          Forgot your password?
+        </a>
+
+      </form>
+    </div>
+
+    <div class="lp-footer">© 2026 IMS · All rights reserved</div>
+  </div>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  document.getElementById('pwdToggle').addEventListener('click', function () {
+    const inp  = document.getElementById('pwdInput');
+    const icon = document.getElementById('pwdIcon');
+    inp.type   = inp.type === 'password' ? 'text' : 'password';
+    icon.className = inp.type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
+  });
+</script>
+{% endblock %}

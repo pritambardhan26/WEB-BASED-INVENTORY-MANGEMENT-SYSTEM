@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#1ABC9C"/>
+  <title>Offline — IMS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1A2035;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #e2e8f0;
+    }
+    .card {
+      text-align: center;
+      padding: 3rem 2.5rem;
+      max-width: 420px;
+      width: 90%;
+      background: #212840;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .icon-wrap {
+      width: 90px; height: 90px;
+      border-radius: 50%;
+      background: rgba(26,188,156,0.12);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.5rem;
+    }
+    .icon-wrap i { font-size: 2.5rem; color: #1ABC9C; }
+    h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: .5rem; }
+    p  { color: #94a3b8; font-size: .95rem; line-height: 1.6; margin-bottom: 2rem; }
+    .btn-retry {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .75rem 2rem;
+      background: #1ABC9C; color: #fff;
+      border: none; border-radius: 10px;
+      font-size: .95rem; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      transition: background .2s, transform .1s;
+    }
+    .btn-retry:hover  { background: #17a88c; color: #fff; }
+    .btn-retry:active { transform: scale(.97); }
+    .cached-links { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.07); }
+    .cached-links p { font-size: .82rem; margin-bottom: .75rem; }
+    .cached-links a {
+      display: inline-block; margin: .25rem .3rem;
+      padding: .35rem .85rem;
+      background: rgba(255,255,255,0.06);
+      border-radius: 20px; color: #94a3b8;
+      font-size: .82rem; text-decoration: none;
+      transition: background .2s;
+    }
+    .cached-links a:hover { background: rgba(26,188,156,0.15); color: #1ABC9C; }
+    .pulse { animation: pulse 2s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .5; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-wrap">
+      <i class="bi bi-wifi-off pulse"></i>
+    </div>
+    <h1>You're Offline</h1>
+    <p>No internet connection detected. Some cached pages may still be available. Check your network and try again.</p>
+    <button class="btn-retry" onclick="retryConnection()">
+      <i class="bi bi-arrow-clockwise"></i> Retry Connection
+    </button>
+    <div class="cached-links">
+      <p>Try cached pages:</p>
+      <a href="/dashboard"><i class="bi bi-grid-fill"></i> Dashboard</a>
+      <a href="/sales/"><i class="bi bi-cart-fill"></i> Sales</a>
+      <a href="/products/"><i class="bi bi-box-seam-fill"></i> Products</a>
+      <a href="/customers/"><i class="bi bi-person-lines-fill"></i> Customers</a>
+    </div>
+  </div>
+  <script>
+    function retryConnection() {
+      const btn = document.querySelector('.btn-retry');
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Checking...';
+      btn.disabled = true;
+      fetch('/dashboard', { method: 'HEAD', cache: 'no-store' })
+        .then(() => { window.location.href = '/dashboard'; })
+        .catch(() => {
+          btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Still Offline — Retry';
+          btn.disabled = false;
+        });
+    }
+
+    // Auto-retry when connection restores
+    window.addEventListener('online', () => {
+      window.location.href = '/dashboard';
+    });
+  </script>
+</body>
+</html>

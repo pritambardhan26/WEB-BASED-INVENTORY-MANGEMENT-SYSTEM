@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Employees{% endblock %}
+{% block page_title %}<i class="bi bi-people-fill me-2 text-primary-ims"></i>Employees{% endblock %}
+
+{% block content %}
+<div class="search-bar">
+  <input class="search-input" id="searchQ" placeholder="Search name / ID / phone / email…" oninput="loadList()"/>
+  <button class="btn-ims btn-ghost-ims" onclick="resetSearch()"><i class="bi bi-x-lg"></i> Reset</button>
+  <button class="btn-ims btn-ghost-ims ms-auto" onclick="exportTableCSV('empTable','employees.csv')">
+    <i class="bi bi-download"></i> CSV
+  </button>
+</div>
+
+<div class="card mb-4">
+  <div style="overflow-x:auto">
+    <table class="ims-table" id="empTable">
+      <thead>
+        <tr>
+          <th>Emp ID</th><th>Name</th><th>Phone</th>
+          <th>Email</th><th>Role</th><th>Join Date</th>
+        </tr>
+      </thead>
+      <tbody id="empBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Form -->
+<div class="form-section">
+  <div class="section-title"><i class="bi bi-pencil-square me-1"></i>Add / Edit Employee</div>
+  <div class="row g-3">
+    <div class="col-md-2">
+      <label class="form-label-ims">Emp ID</label>
+      <div class="d-flex gap-1">
+        <input class="form-control-ims flex-fill" id="fEmpId" placeholder="ID"/>
+        <button class="btn-ims btn-ghost-ims" onclick="autoId()" title="Auto ID">
+          <i class="bi bi-magic"></i>
+        </button>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label-ims">Full Name</label>
+      <input class="form-control-ims w-100" id="fName" placeholder="Full name"/>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label-ims">Phone</label>
+      <input class="form-control-ims w-100" id="fPhone" placeholder="10-digit mobile"/>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label-ims">Email</label>
+      <input class="form-control-ims w-100" id="fEmail" type="email" placeholder="email@company.com"/>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label-ims">Role</label>
+      <select class="form-control-ims w-100" id="fRole">
+        <option>Employee</option><option>Admin</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label-ims">Join Date</label>
+      <input class="form-control-ims w-100" id="fJoinDate" type="date"/>
+    </div>
+  </div>
+  <div class="d-flex gap-2 mt-3 flex-wrap">
+    <button class="btn-ims btn-success-ims" onclick="saveEmp()">
+      <i class="bi bi-check-lg"></i> Save
+    </button>
+    <button class="btn-ims btn-danger-ims" onclick="deleteEmp()">
+      <i class="bi bi-trash"></i> Delete
+    </button>
+    <button class="btn-ims btn-accent-ims" onclick="createLogin()">
+      <i class="bi bi-person-plus-fill"></i> Create Login
+    </button>
+    <button class="btn-ims btn-ghost-ims" onclick="clearForm()">
+      <i class="bi bi-x-circle"></i> Clear
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedEmpId = null;
+
+async function loadList() {
+  const q = document.getElementById('searchQ').value;
+  const d = await apiCall(`/employees/api/list?q=${encodeURIComponent(q)}`);
+  if (!d) return;
+  renderRows('empBody', d.employees, (e, i) => `
+    <td class="fw-mono">${e.emp_id}</td>
+    <td><strong>${e.name}</strong></td>
+    <td>${e.phone}</td>
+    <td>${e.email}</td>
+    <td><span class="badge ${e.role==='Admin'?'badge-admin':'badge-employee'}">${e.role}</span></td>
+    <td>${e.join_date}</td>
+  `);
+  makeSortable('empTable');
+  initRowSelect('empTable', row => {
+    const cells = row.querySelectorAll('td');
+    selectedEmpId = cells[0].textContent;
+    document.getElementById('fEmpId').value    = cells[0].textContent;
+    document.getElementById('fName').value     = cells[1].textContent;
+    document.getElementById('fPhone').value    = cells[2].textContent;
+    document.getElementById('fEmail').value    = cells[3].textContent;
+    document.getElementById('fRole').value     = cells[4].textContent.trim();
+    document.getElementById('fJoinDate').value = cells[5].textContent;
+  });
+}
+
+async function autoId() {
+  const d = await apiCall('/employees/api/next-id');
+  if (d) document.getElementById('fEmpId').value = d.emp_id;
+}
+
+async function saveEmp() {
+  const payload = {
+    emp_id:    document.getElementById('fEmpId').value.trim(),
+    name:      document.getElementById('fName').value.trim(),
+    phone:     document.getElementById('fPhone').value.trim(),
+    email:     document.getElementById('fEmail').value.trim(),
+    role:      document.getElementById('fRole').value,
+    join_date: document.getElementById('fJoinDate').value,
+  };
+  const d = await apiCall('/employees/api/save', 'POST', payload);
+  if (!d) return;
+  showToast(d.message, d.success ? 'success' : 'danger');
+  if (d.success) { clearForm(); loadList(); }
+}
+
+async function deleteEmp() {
+  const id = document.getElementById('fEmpId').value.trim();
+  if (!id) return showToast('Select an employee first.', 'warning');
+  if (!confirm2(`Delete employee ${id}?`)) return;
+  const d = await apiCall(`/employees/api/delete/${id}`, 'DELETE');
+  if (d) { showToast(d.message, d.success?'success':'danger'); clearForm(); loadList(); }
+}
+
+async function createLogin() {
+  const id = document.getElementById('fEmpId').value.trim();
+  if (!id) return showToast('Save employee first.', 'warning');
+  const d = await apiCall('/employees/api/create-login', 'POST', { emp_id: id });
+  if (d) showToast(d.message, d.success?'success':'danger');
+}
+
+function clearForm() {
+  selectedEmpId = null;
+  ['fEmpId','fName','fPhone','fEmail','fJoinDate'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('fRole').value = 'Employee';
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('fJoinDate').value = today;
+}
+
+function resetSearch() {
+  document.getElementById('searchQ').value = '';
+  loadList();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  clearForm();
+  loadList();
+});
+</script>
+{% endblock %}

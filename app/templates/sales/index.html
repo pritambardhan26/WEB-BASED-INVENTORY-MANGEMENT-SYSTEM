@@ -1,0 +1,1627 @@
+{% extends "base.html" %}
+{% block title %}Sales / POS{% endblock %}
+{% block page_title %}<i class="bi bi-cart-fill me-2 text-primary-ims"></i>Sales / POS{% endblock %}
+
+{% block content %}
+
+<!-- Hidden scanner input (legacy fallback for scanners that need a focused field) -->
+<input id="scannerInput" style="position:absolute;left:-9999px;top:-9999px" autocomplete="off"/>
+
+<!-- ── Scanner Status Bar ────────────────────────────────── -->
+<div class="scanner-bar" id="scannerBar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <i class="bi bi-upc-scan" style="color:#43A047;font-size:1rem"></i>
+    <span style="font-weight:700;color:#1B5E20;font-size:.82rem;letter-spacing:.3px">BARCODE SCANNER</span>
+    <span id="scannerDot" style="color:#43A047;font-size:.9rem;transition:color .3s">●</span>
+    <span id="scannerStatus" style="font-size:.82rem;color:#555">Ready — scan any product barcode</span>
+  </div>
+  <button onclick="refocusScanner()"
+    style="margin-left:auto;background:#43A047;color:white;border:none;border-radius:6px;
+           padding:4px 12px;font-size:.8rem;cursor:pointer;display:flex;align-items:center;gap:5px">
+    <i class="bi bi-qr-code-scan"></i> Re-activate
+  </button>
+</div>
+
+<!-- ── Tabs ──────────────────────────────────────────────── -->
+<div class="ims-tabs mt-2">
+  <button class="ims-tab active" data-tab="tabNewSale">
+    <i class="bi bi-cart-plus me-1"></i>New Sale
+  </button>
+  <button class="ims-tab" data-tab="tabHeld">
+    <i class="bi bi-pause-circle me-1"></i>Held Bills
+    <span id="heldCount" class="badge bg-warning text-dark ms-1" style="display:none">0</span>
+  </button>
+  <button class="ims-tab" data-tab="tabHistory">
+    <i class="bi bi-clock-history me-1"></i>Sales History
+  </button>
+  <button class="ims-tab" data-tab="tabReturns">
+    <i class="bi bi-arrow-return-left me-1"></i>Returns
+  </button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     TAB 1 — NEW SALE
+     ════════════════════════════════════════════════════════ -->
+<div class="ims-tab-pane active" id="tabNewSale">
+
+  <div class="form-section mb-3">
+    <div class="section-title">
+      <i class="bi bi-search me-1"></i>Select Product
+    </div>
+
+    <!-- Row 1: Product search + fields -->
+    <div class="row g-2">
+      <div class="col-md-5" style="position:relative">
+        <label class="form-label-ims">Search Product</label>
+        <input type="text" class="form-control-ims w-100" id="prodSearch"
+               placeholder="Type product name, ID or scan barcode…"
+               oninput="filterProducts()" onfocus="showDropdown()" autocomplete="off"/>
+        <div id="prodDropdown"
+             style="display:none;position:absolute;z-index:9999;background:white;
+                    border:1.5px solid #1ABC9C;border-radius:8px;max-height:220px;
+                    overflow-y:auto;width:100%;min-width:320px;
+                    box-shadow:0 8px 24px rgba(0,0,0,.14);">
+        </div>
+        <div id="selectedProd"
+             style="display:none;margin-top:5px;background:#E8F5E9;border-radius:8px;
+                    padding:5px 10px;font-size:.82rem;color:#1B5E20;font-weight:600">
+        </div>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label-ims">Category</label>
+        <input class="form-control-ims w-100" id="prodCat" readonly/>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label-ims">Unit Price</label>
+        <input class="form-control-ims w-100" id="prodPrice" readonly/>
+      </div>
+      <div class="col-md-1">
+        <label class="form-label-ims">GST%</label>
+        <input class="form-control-ims w-100" id="prodGst" readonly/>
+      </div>
+      <div class="col-md-1">
+        <label class="form-label-ims">Stock</label>
+        <input class="form-control-ims w-100" id="prodStock" readonly/>
+      </div>
+      <div class="col-md-1">
+        <label class="form-label-ims">Qty</label>
+        <input class="form-control-ims w-100" id="prodQty" type="number"
+               value="1" min="1"
+               onfocus="pauseScanner()" onblur="resumeScanner()"/>
+      </div>
+    </div>
+
+    <!-- Row 2: Discount + Customer -->
+    <div class="row g-2 mt-1">
+      <div class="col-md-2">
+        <label class="form-label-ims">Disc Type</label>
+        <select class="form-control-ims w-100" id="discType">
+          <option>Flat</option>
+          <option>Percent</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label-ims">Disc Value</label>
+        <input class="form-control-ims w-100" id="discVal" type="number"
+               value="0" min="0"
+               onfocus="pauseScanner()" onblur="resumeScanner()"/>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label-ims">Customer</label>
+        <select class="form-control-ims w-100" id="custSelect" onchange="onCustChange()">
+          <option value="">Walk-in</option>
+        </select>
+      </div>
+      <div class="col-md-4" id="newCustRow" style="display:none">
+        <div class="row g-1">
+          <div class="col-4">
+            <input class="form-control-ims w-100" id="newCustName" placeholder="Name"
+                   onfocus="pauseScanner()" onblur="resumeScanner()"/>
+          </div>
+          <div class="col-3">
+            <input class="form-control-ims w-100" id="newCustPhone" placeholder="Phone"
+                   onfocus="pauseScanner()" onblur="resumeScanner()"/>
+          </div>
+          <div class="col-3">
+            <input class="form-control-ims w-100" id="newCustEmail" placeholder="Email"
+                   onfocus="pauseScanner()" onblur="resumeScanner()"/>
+          </div>
+          <div class="col-2">
+            <button onclick="saveNewCust()"
+              style="background:#E67E22;color:white;border:none;border-radius:8px;
+                     padding:8px;cursor:pointer;width:100%">
+              <i class="bi bi-person-plus"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Payment Mode -->
+    <div class="row g-2 mt-1">
+      <div class="col-12">
+        <label class="form-label-ims">Payment Mode</label>
+        <div class="d-flex gap-2 flex-wrap" id="paymentModes">
+          <label class="payment-mode-btn active" onclick="selectPayment('Cash',this)">
+            <i class="bi bi-cash"></i> Cash
+          </label>
+          <label class="payment-mode-btn" onclick="selectPayment('UPI',this)">
+            <i class="bi bi-phone"></i> UPI
+          </label>
+          <label class="payment-mode-btn" onclick="selectPayment('Card',this)">
+            <i class="bi bi-credit-card"></i> Card
+          </label>
+          <label class="payment-mode-btn" onclick="selectPayment('Credit',this)">
+            <i class="bi bi-person-check"></i> Credit
+          </label>
+          <label class="payment-mode-btn" onclick="selectPayment('Split',this)">
+            <i class="bi bi-distribute-vertical"></i> Split
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Split Payment Fields -->
+    <div class="row g-2 mt-1" id="splitFields" style="display:none">
+      <div class="col-md-4">
+        <label class="form-label-ims">Cash Amount (₹)</label>
+        <input class="form-control-ims w-100" id="splitCash" type="number"
+               value="0" min="0" oninput="updateSplitBalance()"
+               onfocus="pauseScanner()" onblur="resumeScanner()"/>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label-ims">UPI Amount (₹)</label>
+        <input class="form-control-ims w-100" id="splitUPI" type="number"
+               value="0" min="0" oninput="updateSplitBalance()"
+               onfocus="pauseScanner()" onblur="resumeScanner()"/>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label-ims">Card Amount (₹)</label>
+        <input class="form-control-ims w-100" id="splitCard" type="number"
+               value="0" min="0" oninput="updateSplitBalance()"
+               onfocus="pauseScanner()" onblur="resumeScanner()"/>
+      </div>
+      <div class="col-12">
+        <div id="splitBalance"
+             style="font-size:.85rem;padding:6px 10px;border-radius:6px;
+                    background:#FFF3CD;color:#856404"></div>
+      </div>
+    </div>
+
+    <!-- UPI Info Panel -->
+    <div id="upiFields" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="background:linear-gradient(135deg,#6F3FC1,#4A90D9);color:white;
+                    border-radius:8px;padding:5px 12px;font-weight:700;
+                    font-size:.82rem;letter-spacing:.5px">UPI</div>
+        <span style="font-size:.83rem;color:#374151;font-weight:600">
+          QR code will appear at checkout
+        </span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;background:white;
+                  border-radius:8px;padding:8px 12px;border:1px solid #DDD6FE">
+        <i class="bi bi-phone-fill" style="color:#6F3FC1;font-size:1rem"></i>
+        <div>
+          <div style="font-size:.72rem;color:#7C3AED;font-weight:600;
+                      text-transform:uppercase;letter-spacing:.4px">UPI ID</div>
+          <div id="upiIdPanelDisplay"
+               style="font-family:monospace;font-size:.9rem;font-weight:700;color:#1E1B4B">
+          </div>
+        </div>
+        <div style="margin-left:auto;font-size:.75rem;color:#6B7280;
+                    background:#F3F4F6;padding:3px 8px;border-radius:6px">
+          <i class="bi bi-qr-code me-1"></i>Auto QR on Pay
+        </div>
+      </div>
+      <div style="margin-top:6px;font-size:.75rem;color:#6B7280;
+                  display:flex;align-items:center;gap:5px">
+        <i class="bi bi-info-circle" style="color:#7C3AED"></i>
+        Scan QR or pay directly to UPI ID. Click
+        <strong>Checkout + Invoice</strong> to generate QR.
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="d-flex gap-2 mt-3 flex-wrap">
+      <button onclick="addToCart()"
+        style="background:#E67E22;color:white;border:none;border-radius:8px;
+               padding:8px 16px;font-weight:600;cursor:pointer;font-size:.88rem">
+        <i class="bi bi-cart-plus"></i> Add to Cart
+      </button>
+      <button onclick="removeSelected()"
+        style="background:#F0F2F5;color:#2C3E50;border:1px solid #e3e6ef;
+               border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer;font-size:.88rem">
+        <i class="bi bi-dash-circle"></i> Remove
+      </button>
+      <button onclick="clearCart()"
+        style="background:#F0F2F5;color:#2C3E50;border:1px solid #e3e6ef;
+               border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer;font-size:.88rem">
+        <i class="bi bi-x-circle"></i> Clear
+      </button>
+      <button onclick="holdBill()"
+        style="background:#8E44AD;color:white;border:none;border-radius:8px;
+               padding:8px 14px;font-weight:600;cursor:pointer;font-size:.88rem">
+        <i class="bi bi-pause-circle"></i> Hold Bill
+      </button>
+    </div>
+  </div>
+
+  <!-- Cart Table -->
+  <div class="card mb-3">
+    <div class="card-header-ims">
+      <i class="bi bi-cart3 me-1"></i>Cart
+      <span id="cartBadge" style="background:#E67E22;color:white;border-radius:12px;
+            padding:1px 10px;font-size:.78rem;font-weight:700;margin-left:6px;display:none">
+        0 items
+      </span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="ims-table" id="cartTable">
+        <thead>
+          <tr>
+            <th>ID</th><th>Name</th><th>Cat</th><th>Qty</th>
+            <th>Unit</th><th>GST%</th><th>CGST</th><th>SGST</th>
+            <th>Disc</th><th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="cartBody"></tbody>
+      </table>
+    </div>
+    <div class="cart-totals">
+      <span>Subtotal: <strong id="totSubtotal">₹0.00</strong></span>
+      <span>+ GST: <strong id="totGst" style="color:#E67E22">₹0.00</strong></span>
+      <span class="cart-total-grand">
+        = Grand Total: <strong id="totGrand">₹0.00</strong>
+      </span>
+      <button onclick="openCheckout()"
+        style="margin-left:auto;background:#27AE60;color:white;border:none;
+               border-radius:8px;padding:9px 18px;font-weight:700;
+               cursor:pointer;font-size:.92rem">
+        <i class="bi bi-check2-circle"></i> Checkout + Invoice
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     TAB 2 — HELD BILLS
+     ════════════════════════════════════════════════════════ -->
+<div class="ims-tab-pane" id="tabHeld">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="mb-0"><i class="bi bi-pause-circle me-2"></i>Held Bills</h6>
+    <button onclick="loadHeldBills()"
+      style="background:#F0F2F5;border:1px solid #ddd;border-radius:6px;
+             padding:4px 12px;cursor:pointer;font-size:.82rem">
+      <i class="bi bi-arrow-clockwise"></i> Refresh
+    </button>
+  </div>
+  <div id="heldBillsList"></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     TAB 3 — SALES HISTORY
+     ════════════════════════════════════════════════════════ -->
+<div class="ims-tab-pane" id="tabHistory">
+  <div class="card">
+    <div class="card-header-ims">
+      <span><i class="bi bi-clock-history me-1"></i>Recent 50 Sales</span>
+      <div class="d-flex gap-2">
+        <button onclick="loadHistory()"
+          style="background:#F0F2F5;border:1px solid #e3e6ef;border-radius:6px;
+                 padding:4px 10px;cursor:pointer;font-size:.8rem">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+        <button onclick="exportTableCSV('histTable','sales.csv')"
+          style="background:#F0F2F5;border:1px solid #e3e6ef;border-radius:6px;
+                 padding:4px 10px;cursor:pointer;font-size:.8rem">
+          <i class="bi bi-download"></i> CSV
+        </button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="ims-table" id="histTable">
+        <thead>
+          <tr>
+            <th>ID</th><th>Date</th><th>Sold By</th><th>Customer</th>
+            <th>Phone</th><th>Subtotal</th><th>GST</th><th>Grand Total</th><th>Payment</th>
+          </tr>
+        </thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     TAB 4 — RETURNS
+     ════════════════════════════════════════════════════════ -->
+<div class="ims-tab-pane" id="tabReturns">
+  <div class="form-section mb-3">
+    <div class="section-title">Process Return / Refund</div>
+    <div class="row g-2 mb-3">
+      <div class="col-md-6">
+        <label class="form-label-ims">Select Sale (last 10 days)</label>
+        <select class="form-control-ims w-100" id="retSaleSelect" onchange="loadSaleItems()">
+          <option value="">— Select a sale —</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label-ims">Reason</label>
+        <input class="form-control-ims w-100" id="retReason"
+               placeholder="e.g. Defective product"
+               onfocus="pauseScanner()" onblur="resumeScanner()"/>
+      </div>
+    </div>
+    <div style="overflow-x:auto" class="mb-3">
+      <table class="ims-table" id="retItemTable">
+        <thead>
+          <tr>
+            <th>Product</th><th>Qty Sold</th><th>Unit Price</th>
+            <th>Refund Qty</th><th>Refund Amt</th>
+          </tr>
+        </thead>
+        <tbody id="retItemBody"></tbody>
+      </table>
+    </div>
+    <button onclick="processReturn()"
+      style="background:#E74C3C;color:white;border:none;border-radius:8px;
+             padding:9px 18px;font-weight:700;cursor:pointer">
+      <i class="bi bi-arrow-return-left"></i> Process Refund
+    </button>
+  </div>
+  <div class="card">
+    <div class="card-header-ims">
+      <i class="bi bi-arrow-return-left me-1"></i>Return History
+    </div>
+    <div style="overflow-x:auto">
+      <table class="ims-table" id="retHistTable">
+        <thead>
+          <tr>
+            <th>ID</th><th>Sale ID</th><th>Product</th><th>Qty</th>
+            <th>Refund</th><th>Date</th><th>Reason</th>
+          </tr>
+        </thead>
+        <tbody id="retHistBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     CHECKOUT MODAL
+     ════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="checkoutModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-receipt-cutoff me-2"></i>Confirm Checkout
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="checkoutBody"
+           style="max-height:460px;overflow-y:auto"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button onclick="confirmCheckout()"
+          style="background:#27AE60;color:white;border:none;border-radius:8px;
+                 padding:8px 20px;font-weight:700;cursor:pointer">
+          <i class="bi bi-check2-circle"></i> Confirm & Checkout
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     UPI QR PAYMENT MODAL
+     ════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="upiQRModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-md modal-dialog-centered">
+    <div class="modal-content"
+         style="border-radius:16px;overflow:hidden;border:none;
+                box-shadow:0 20px 60px rgba(0,0,0,.2)">
+
+      <!-- Modal Header -->
+      <div style="background:linear-gradient(135deg,#6F3FC1,#4A90D9);
+                  padding:20px 24px;color:white;position:relative">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="background:rgba(255,255,255,.2);border-radius:12px;
+                      padding:8px;display:flex">
+            <svg width="28" height="28" viewBox="0 0 48 48" fill="none"
+                 xmlns="http://www.w3.org/2000/svg">
+              <rect width="48" height="48" rx="10" fill="white" fill-opacity="0.15"/>
+              <text x="24" y="32" text-anchor="middle" font-family="Arial"
+                    font-weight="800" font-size="18" fill="white">UPI</text>
+            </svg>
+          </div>
+          <div>
+            <h5 class="mb-0" style="font-weight:700;font-size:1.1rem">UPI Payment</h5>
+            <small style="opacity:.8">Scan QR code to pay instantly</small>
+          </div>
+        </div>
+        <button type="button" onclick="cancelUPIPayment()"
+          style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.2);
+                 border:none;color:white;border-radius:50%;width:30px;height:30px;
+                 font-size:1rem;cursor:pointer;display:flex;align-items:center;
+                 justify-content:center">&times;</button>
+      </div>
+
+      <div class="modal-body p-0">
+        <!-- Amount Banner -->
+        <div style="background:#F0FDF4;border-bottom:1px solid #BBF7D0;
+                    padding:14px 24px;text-align:center">
+          <div style="font-size:.78rem;color:#166534;font-weight:600;
+                      letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px">
+            Amount to Pay
+          </div>
+          <div id="upiAmountDisplay"
+               style="font-size:2rem;font-weight:800;color:#15803D">₹0.00</div>
+        </div>
+
+        <!-- QR Code -->
+        <div style="padding:20px 24px;text-align:center">
+          <div style="position:relative;display:inline-block">
+            <div style="background:white;border:2px solid #E2E8F0;border-radius:16px;
+                        padding:14px;box-shadow:0 4px 16px rgba(0,0,0,.08)">
+              <div id="upiQRCode"
+                   style="width:200px;height:200px;display:flex;align-items:center;
+                          justify-content:center">
+                <div style="color:#94A3B8;font-size:.85rem">Generating QR…</div>
+              </div>
+            </div>
+            <!-- Corner accents -->
+            <div style="position:absolute;top:-3px;left:-3px;width:20px;height:20px;
+                        border-top:3px solid #6F3FC1;border-left:3px solid #6F3FC1;
+                        border-radius:4px 0 0 0"></div>
+            <div style="position:absolute;top:-3px;right:-3px;width:20px;height:20px;
+                        border-top:3px solid #6F3FC1;border-right:3px solid #6F3FC1;
+                        border-radius:0 4px 0 0"></div>
+            <div style="position:absolute;bottom:-3px;left:-3px;width:20px;height:20px;
+                        border-bottom:3px solid #6F3FC1;border-left:3px solid #6F3FC1;
+                        border-radius:0 0 0 4px"></div>
+            <div style="position:absolute;bottom:-3px;right:-3px;width:20px;height:20px;
+                        border-bottom:3px solid #6F3FC1;border-right:3px solid #6F3FC1;
+                        border-radius:0 0 4px 0"></div>
+          </div>
+
+          <!-- UPI ID display -->
+          <div style="margin-top:14px;background:#F8FAFC;border-radius:10px;
+                      padding:10px 14px;display:inline-flex;align-items:center;
+                      gap:8px;border:1px solid #E2E8F0">
+            <i class="bi bi-phone-fill" style="color:#6F3FC1"></i>
+            <span id="upiIdDisplay"
+                  style="font-family:monospace;font-size:.9rem;
+                         font-weight:600;color:#374151"></span>
+            <button onclick="copyUPIId()"
+              style="background:none;border:none;cursor:pointer;color:#6F3FC1;padding:0"
+              title="Copy UPI ID">
+              <i class="bi bi-clipboard" id="upiCopyIcon"></i>
+            </button>
+          </div>
+
+          <!-- App Icons -->
+          <div style="margin-top:12px">
+            <div style="font-size:.72rem;color:#94A3B8;margin-bottom:8px;
+                        font-weight:600;text-transform:uppercase;letter-spacing:.5px">
+              Pay using any UPI app
+            </div>
+            <div style="display:flex;gap:12px;justify-content:center;
+                        align-items:center;flex-wrap:wrap">
+              <div style="text-align:center">
+                <div style="width:40px;height:40px;background:#00BA37;border-radius:10px;
+                            display:flex;align-items:center;justify-content:center;
+                            margin:0 auto 3px">
+                  <span style="color:white;font-weight:800;font-size:.7rem">GPay</span>
+                </div>
+                <span style="font-size:.65rem;color:#64748B">Google Pay</span>
+              </div>
+              <div style="text-align:center">
+                <div style="width:40px;height:40px;background:#512DA8;border-radius:10px;
+                            display:flex;align-items:center;justify-content:center;
+                            margin:0 auto 3px">
+                  <span style="color:white;font-weight:800;font-size:.7rem">PhPe</span>
+                </div>
+                <span style="font-size:.65rem;color:#64748B">PhonePe</span>
+              </div>
+              <div style="text-align:center">
+                <div style="width:40px;height:40px;background:#002970;border-radius:10px;
+                            display:flex;align-items:center;justify-content:center;
+                            margin:0 auto 3px">
+                  <span style="color:white;font-weight:800;font-size:.65rem">PAYTM</span>
+                </div>
+                <span style="font-size:.65rem;color:#64748B">Paytm</span>
+              </div>
+              <div style="text-align:center">
+                <div style="width:40px;height:40px;background:#FF6B00;border-radius:10px;
+                            display:flex;align-items:center;justify-content:center;
+                            margin:0 auto 3px">
+                  <span style="color:white;font-weight:800;font-size:.7rem">BHIM</span>
+                </div>
+                <span style="font-size:.65rem;color:#64748B">BHIM UPI</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timer -->
+        <div style="background:#FFFBEB;border-top:1px solid #FDE68A;
+                    border-bottom:1px solid #FDE68A;padding:10px 24px;
+                    display:flex;align-items:center;gap:10px">
+          <i class="bi bi-clock" style="color:#D97706;font-size:1rem"></i>
+          <div style="flex:1">
+            <div style="font-size:.8rem;color:#92400E;font-weight:600">
+              QR expires in
+              <span id="upiTimer" style="color:#B45309;font-weight:800">05:00</span>
+            </div>
+            <div style="font-size:.72rem;color:#B45309">Refresh if expired</div>
+          </div>
+          <button onclick="refreshUPIQR()"
+            style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;
+                   padding:4px 10px;font-size:.75rem;color:#92400E;
+                   cursor:pointer;font-weight:600">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+          </button>
+        </div>
+
+        <!-- Confirm / Cancel -->
+        <div style="padding:16px 24px;display:flex;gap:10px">
+          <button onclick="cancelUPIPayment()"
+            style="flex:1;background:#F1F5F9;color:#475569;border:none;
+                   border-radius:10px;padding:11px;font-weight:600;
+                   cursor:pointer;font-size:.88rem">
+            <i class="bi bi-x-circle"></i> Cancel
+          </button>
+          <button onclick="confirmUPIPaymentDone()"
+            style="flex:2;background:linear-gradient(135deg,#16A34A,#15803D);
+                   color:white;border:none;border-radius:10px;padding:11px;
+                   font-weight:700;cursor:pointer;font-size:.92rem;
+                   box-shadow:0 4px 12px rgba(22,163,74,.3)">
+            <i class="bi bi-check2-circle"></i> Payment Done – Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Payment Mode Buttons ───────────────────────────── */
+.payment-mode-btn {
+  padding: 7px 14px;
+  border: 2px solid #e3e6ef;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .85rem;
+  font-weight: 600;
+  color: #666;
+  transition: all .2s;
+  user-select: none;
+}
+.payment-mode-btn:hover  { border-color: #1ABC9C; color: #1ABC9C; }
+.payment-mode-btn.active { background: #1ABC9C; border-color: #1ABC9C; color: white; }
+.payment-mode-btn.upi-active {
+  background: linear-gradient(135deg,#6F3FC1,#4A90D9) !important;
+  border-color: #6F3FC1 !important;
+  color: white !important;
+}
+
+/* ── UPI Info Panel ─────────────────────────────────── */
+#upiFields {
+  background: linear-gradient(135deg,#F5F3FF,#EFF6FF);
+  border: 1.5px solid #DDD6FE;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 8px;
+}
+
+/* ── Scanner Bar ────────────────────────────────────── */
+.scanner-bar {
+  background: linear-gradient(135deg,#E8F5E9,#F1F8E9);
+  border: 1.5px solid #A5D6A7;
+  border-radius: 10px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.scanner-bar.paused {
+  background: linear-gradient(135deg,#FFF8E1,#FFFDE7);
+  border-color: #FFE082;
+}
+
+/* ── Cart row selection ─────────────────────────────── */
+#cartBody tr { cursor: pointer; }
+#cartBody tr.selected { background: #E8F5E9 !important; }
+#cartBody tr:hover    { background: #F9FBE7; }
+</style>
+
+<!-- QR Code library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════
+let cart                   = [];
+let allProducts            = [];
+let selectedProduct        = null;
+let scannerPaused          = false;
+let retItems               = [];
+let currentPaymentMode     = 'Cash';
+let pendingCheckoutPayload = null;
+let upiTimerInterval       = null;
+let upiTimerSeconds        = 300;
+let upiQRInstance          = null;
+
+const UPI_CONFIG = {
+  upiId:     'lalbaghenterprise@upi',
+  payeeName: 'LALBAGH ENTERPRISE',
+  currency:  'INR',
+};
+
+// ════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════
+function fmt(v) {
+  return '₹' + (parseFloat(v) || 0).toFixed(2);
+}
+
+function calc(unitPrice, qty, gstPct, discType, discVal) {
+  const base    = qty * unitPrice;
+  const discAmt = discType === 'Flat' ? discVal : base * discVal / 100;
+  const after   = Math.max(base - discAmt, 0);
+  const half    = gstPct / 2;
+  const cgst    = Math.round(after * half / 100 * 100) / 100;
+  const sgst    = Math.round(after * half / 100 * 100) / 100;
+  return {
+    base,
+    after,
+    discAmt:  Math.round(discAmt * 100) / 100,
+    cgst, sgst,
+    gst:   cgst + sgst,
+    final: Math.round((after + cgst + sgst) * 100) / 100,
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+//  STOCK CONFLICT HANDLER
+// ════════════════════════════════════════════════════════════
+function handleStockConflict(productId, available, message) {
+  soundError();
+  showToast(message, 'warning');
+  const idx = cart.findIndex(i => i.product_id == productId);
+  if (idx < 0) return;
+  if (available <= 0) {
+    cart.splice(idx, 1);
+    showToast('Item removed — no stock left.', 'warning');
+  } else {
+    cart[idx].qty = available;
+    showToast(`Qty adjusted to available stock: ${available}`, 'info');
+  }
+  renderCart();
+}
+
+// ════════════════════════════════════════════════════════════
+//  WEB AUDIO BEEPS
+// ════════════════════════════════════════════════════════════
+function _beep(freq, dur, type = 'sine', vol = 0.4) {
+  try {
+    const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + dur);
+  } catch (e) {}
+}
+function soundSuccess()   { _beep(1046, 0.12); setTimeout(() => _beep(1318, 0.15), 100); }
+function soundError()     { _beep(220, 0.35, 'sawtooth'); }
+function soundDuplicate() { _beep(880, 0.1); }
+
+// ════════════════════════════════════════════════════════════
+//  SCANNER CONTROL
+// ════════════════════════════════════════════════════════════
+function pauseScanner() {
+  scannerPaused = true;
+  document.getElementById('scannerBar').classList.add('paused');
+  document.getElementById('scannerDot').style.color    = '#FFA000';
+  document.getElementById('scannerStatus').textContent = 'Paused (input focused)';
+}
+
+function resumeScanner() {
+  scannerPaused = false;
+  document.getElementById('scannerBar').classList.remove('paused');
+  document.getElementById('scannerDot').style.color    = '#43A047';
+  document.getElementById('scannerStatus').textContent = 'Ready — scan any product barcode';
+}
+
+function refocusScanner() {
+  scannerPaused = false;
+  document.getElementById('scannerInput').focus();
+  resumeScanner();
+}
+
+// Legacy hidden-field scanner fallback
+document.getElementById('scannerInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') {
+    const code = e.target.value.trim();
+    e.target.value = '';
+    if (code) legacyScanProcess(code);
+    e.preventDefault();
+  }
+});
+
+function legacyScanProcess(code) {
+  const p = allProducts.find(x =>
+    String(x.product_id) === code || (x.barcode && x.barcode === code)
+  );
+  if (p) {
+    selectProduct(p.product_id);
+    document.getElementById('prodQty').value = '1';
+    addToCart(true);
+    document.getElementById('scannerStatus').textContent = 'Added: ' + p.name;
+    setTimeout(resumeScanner, 1500);
+  } else {
+    document.getElementById('scannerDot').style.color    = '#E74C3C';
+    document.getElementById('scannerStatus').textContent = 'Not found: ' + code;
+    setTimeout(resumeScanner, 2000);
+  }
+}
+
+// ── HID keyboard barcode scanner (document-level keydown) ──
+(function () {
+  let buf = '', timer = null;
+
+  document.addEventListener('keydown', function (e) {
+    if (scannerPaused) return;
+    const tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    if (e.key === 'Enter') {
+      if (buf.length > 2) handleBarcode(buf.trim());
+      buf = '';
+      clearTimeout(timer);
+    } else if (e.key.length === 1) {
+      buf += e.key;
+      clearTimeout(timer);
+      timer = setTimeout(() => { buf = ''; }, 200);
+    }
+  });
+
+  async function handleBarcode(code) {
+    try {
+      document.getElementById('scannerDot').style.color    = '#FFA000';
+      document.getElementById('scannerStatus').textContent = 'Looking up: ' + code;
+
+      const res  = await fetch(`/sales/api/barcode/${encodeURIComponent(code)}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        soundError();
+        showToast(data.message, 'danger');
+        document.getElementById('scannerDot').style.color    = '#E74C3C';
+        document.getElementById('scannerStatus').textContent = 'Not found: ' + code;
+        setTimeout(resumeScanner, 2000);
+        return;
+      }
+
+      const p = data.product;
+      // barcode API returns 'gst' — store as gst_pct internally for calc()
+      const existing = cart.find(i => i.product_id === p.product_id);
+
+      if (existing) {
+        if (existing.qty < p.quantity) {
+          existing.qty += 1;
+          const c = calc(existing.unit_price, existing.qty,
+                         existing.gst_pct, existing.disc_type, existing.disc_val);
+          Object.assign(existing, { cgst: c.cgst, sgst: c.sgst, gst: c.gst, final: c.final });
+          soundDuplicate();
+          showToast(`${p.name} qty → ${existing.qty}`, 'info');
+        } else {
+          soundError();
+          showToast(`Max stock reached for ${p.name}`, 'warning');
+        }
+      } else {
+        const gstVal = parseFloat(p.gst) || 0;
+        const c = calc(parseFloat(p.unit_price), 1, gstVal, 'Flat', 0);
+        cart.push({
+          product_id:   p.product_id,
+          product_name: p.name,
+          category:     p.category,
+          unit_price:   parseFloat(p.unit_price),
+          qty:          1,
+          gst_pct:      gstVal,
+          disc_type:    'Flat',
+          disc_val:     0,
+          cgst:         c.cgst,
+          sgst:         c.sgst,
+          gst:          c.gst,
+          final:        c.final,
+        });
+        soundSuccess();
+        showToast(`✔ ${p.name} added to cart`, 'success');
+      }
+
+      renderCart();
+      document.getElementById('scannerDot').style.color    = '#43A047';
+      document.getElementById('scannerStatus').textContent = 'Added: ' + p.name;
+      setTimeout(resumeScanner, 1500);
+
+    } catch (err) {
+      soundError();
+      console.error('Barcode lookup failed', err);
+      document.getElementById('scannerStatus').textContent = 'Lookup error';
+      setTimeout(resumeScanner, 2000);
+    }
+  }
+})();
+
+// ════════════════════════════════════════════════════════════
+//  UPI CONFIG
+// ════════════════════════════════════════════════════════════
+async function loadUPIConfig() {
+  try {
+    const r = await fetch('/sales/api/upi-config');
+    if (r.ok) {
+      const d = await r.json();
+      UPI_CONFIG.upiId     = d.upiId     || UPI_CONFIG.upiId;
+      UPI_CONFIG.payeeName = d.payeeName || UPI_CONFIG.payeeName;
+      UPI_CONFIG.currency  = d.currency  || UPI_CONFIG.currency;
+      const el = document.getElementById('upiIdPanelDisplay');
+      if (el) el.textContent = UPI_CONFIG.upiId;
+    }
+  } catch (e) { /* use defaults */ }
+}
+
+// ════════════════════════════════════════════════════════════
+//  PAYMENT MODE
+// ════════════════════════════════════════════════════════════
+function selectPayment(mode, el) {
+  currentPaymentMode = mode;
+  document.querySelectorAll('.payment-mode-btn').forEach(b => {
+    b.classList.remove('active', 'upi-active');
+  });
+  el.classList.add(mode === 'UPI' ? 'upi-active' : 'active');
+  document.getElementById('splitFields').style.display = mode === 'Split' ? '' : 'none';
+  document.getElementById('upiFields').style.display   = mode === 'UPI'   ? '' : 'none';
+  if (mode === 'Split') updateSplitBalance();
+}
+
+function updateSplitBalance() {
+  const grand = parseFloat(
+    document.getElementById('totGrand').textContent.replace(/[^0-9.]/g, '')) || 0;
+  const cash  = parseFloat(document.getElementById('splitCash').value) || 0;
+  const upi   = parseFloat(document.getElementById('splitUPI').value)  || 0;
+  const card  = parseFloat(document.getElementById('splitCard').value) || 0;
+  const total = cash + upi + card;
+  const diff  = grand - total;
+  const el    = document.getElementById('splitBalance');
+  if (Math.abs(diff) < 0.01) {
+    el.style.background = '#D4EDDA'; el.style.color = '#155724';
+    el.textContent = `✓ Balanced — Total: ₹${grand.toFixed(2)}`;
+  } else if (diff > 0) {
+    el.style.background = '#FFF3CD'; el.style.color = '#856404';
+    el.textContent = `Remaining: ₹${diff.toFixed(2)} — Total needed: ₹${grand.toFixed(2)}`;
+  } else {
+    el.style.background = '#F8D7DA'; el.style.color = '#721C24';
+    el.textContent = `Excess: ₹${Math.abs(diff).toFixed(2)} — Total: ₹${grand.toFixed(2)}`;
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  PRODUCTS & CUSTOMERS
+// ════════════════════════════════════════════════════════════
+async function loadProducts() {
+  const d = await apiCall('/products/api/for-sale');
+  if (d && d.products) allProducts = d.products;
+}
+
+async function loadCustomers() {
+  const d = await apiCall('/customers/api/for-select');
+  if (!d) return;
+  const sel = document.getElementById('custSelect');
+  sel.innerHTML = '<option value="">Walk-in</option>' +
+    (d.customers || []).map(c =>
+      `<option value="${c.customer_id}"
+               data-phone="${c.phone || ''}"
+               data-email="${c.email || ''}">${c.label}</option>`
+    ).join('') +
+    '<option value="__new__">+ Add New Customer</option>';
+}
+
+// ════════════════════════════════════════════════════════════
+//  PRODUCT SEARCH DROPDOWN
+// ════════════════════════════════════════════════════════════
+function filterProducts() {
+  const q  = document.getElementById('prodSearch').value.trim().toLowerCase();
+  const dd = document.getElementById('prodDropdown');
+  if (!q) { dd.style.display = 'none'; return; }
+  const matches = allProducts.filter(p =>
+    p.name.toLowerCase().includes(q) ||
+    String(p.product_id).toLowerCase().includes(q)
+  ).slice(0, 20);
+  if (!matches.length) {
+    dd.innerHTML = '<div style="padding:10px;color:#888;font-size:.85rem">No products found</div>';
+    dd.style.display = 'block';
+    return;
+  }
+  dd.innerHTML = matches.map(p => `
+    <div onclick="selectProduct('${p.product_id}')"
+         style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:.85rem"
+         onmouseover="this.style.background='#E8F5E9'"
+         onmouseout="this.style.background='white'">
+      <span style="font-weight:700;color:#1ABC9C">${p.product_id}</span>
+      — ${p.name}
+      <span style="float:right;color:#888">
+        ${p.category} | ₹${parseFloat(p.unit_price).toFixed(2)} | ${p.quantity}
+      </span>
+    </div>`).join('');
+  dd.style.display = 'block';
+}
+
+function showDropdown() {
+  if (document.getElementById('prodSearch').value.trim()) filterProducts();
+}
+
+function selectProduct(pid) {
+  const p = allProducts.find(x => String(x.product_id) === String(pid));
+  if (!p) return;
+  selectedProduct = p;
+  document.getElementById('prodSearch').value = `${p.product_id} — ${p.name}`;
+  document.getElementById('prodCat').value    = p.category;
+  document.getElementById('prodPrice').value  = `₹${parseFloat(p.unit_price).toFixed(2)}`;
+  // for-sale API returns 'gst' field
+  document.getElementById('prodGst').value    = `${p.gst}%`;
+  document.getElementById('prodStock').value  = p.quantity;
+  const badge = document.getElementById('selectedProd');
+  badge.textContent   = `✓ ${p.name} (Stock: ${p.quantity})`;
+  badge.style.display = 'block';
+  document.getElementById('prodDropdown').style.display = 'none';
+  document.getElementById('prodQty').focus();
+  document.getElementById('prodQty').select();
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#prodSearch') && !e.target.closest('#prodDropdown'))
+    document.getElementById('prodDropdown').style.display = 'none';
+});
+
+// ════════════════════════════════════════════════════════════
+//  CUSTOMER
+// ════════════════════════════════════════════════════════════
+function onCustChange() {
+  const v = document.getElementById('custSelect').value;
+  document.getElementById('newCustRow').style.display = v === '__new__' ? 'block' : 'none';
+}
+
+async function saveNewCust() {
+  const payload = {
+    customer_id: String(Date.now()).slice(-6),
+    name:  document.getElementById('newCustName').value.trim(),
+    phone: document.getElementById('newCustPhone').value.trim(),
+    email: document.getElementById('newCustEmail').value.trim(),
+  };
+  const d = await apiCall('/customers/api/save', 'POST', payload);
+  if (!d) return;
+  showToast(d.message, d.success ? 'success' : 'danger');
+  if (d.success) {
+    await loadCustomers();
+    document.getElementById('newCustRow').style.display = 'none';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  CART
+// ════════════════════════════════════════════════════════════
+function addToCart(fromScan = false) {
+  const p = selectedProduct;
+  if (!p) {
+    if (!fromScan) showToast('Select a product first.', 'warning');
+    return;
+  }
+  const qty      = parseInt(document.getElementById('prodQty').value) || 1;
+  const discType = document.getElementById('discType').value;
+  const discVal  = parseFloat(document.getElementById('discVal').value) || 0;
+  if (qty <= 0) return showToast('Qty must be > 0', 'warning');
+  if (qty > p.quantity) return showToast(`Only ${p.quantity} in stock.`, 'warning');
+
+  // for-sale API returns 'gst' field name
+  const gstPct = parseFloat(p.gst) || 0;
+
+  const idx = cart.findIndex(i =>
+    String(i.product_id) === String(p.product_id) &&
+    i.disc_type === discType &&
+    i.disc_val  === discVal
+  );
+
+  if (idx >= 0) {
+    const newQty = cart[idx].qty + qty;
+    if (newQty > p.quantity) return showToast(`Only ${p.quantity} in stock.`, 'warning');
+    cart[idx].qty = newQty;
+    const c = calc(cart[idx].unit_price, newQty, cart[idx].gst_pct, discType, discVal);
+    Object.assign(cart[idx], { cgst: c.cgst, sgst: c.sgst, gst: c.gst, final: c.final });
+  } else {
+    const c = calc(parseFloat(p.unit_price), qty, gstPct, discType, discVal);
+    cart.push({
+      product_id:   p.product_id,
+      product_name: p.name,
+      category:     p.category,
+      qty,
+      unit_price:   parseFloat(p.unit_price),
+      gst_pct:      gstPct,      // stored internally as gst_pct for calc()
+      disc_type:    discType,
+      disc_val:     discVal,
+      cgst:         c.cgst,
+      sgst:         c.sgst,
+      gst:          c.gst,
+      final:        c.final,
+    });
+  }
+
+  renderCart();
+  showToast(`${p.name} added.`, 'success');
+
+  // Reset product selector
+  document.getElementById('prodSearch').value           = '';
+  document.getElementById('prodCat').value              = '';
+  document.getElementById('prodPrice').value            = '';
+  document.getElementById('prodGst').value              = '';
+  document.getElementById('prodStock').value            = '';
+  document.getElementById('selectedProd').style.display = 'none';
+  document.getElementById('prodQty').value              = '1';
+  document.getElementById('discVal').value              = '0';
+  selectedProduct = null;
+}
+
+function renderCart() {
+  const tbody = document.getElementById('cartBody');
+  tbody.innerHTML = cart.map((item, i) => `
+    <tr data-idx="${i}">
+      <td class="fw-mono">${item.product_id}</td>
+      <td><strong>${item.product_name}</strong></td>
+      <td>${item.category}</td>
+      <td>${item.qty}</td>
+      <td class="fw-mono">${fmt(item.unit_price)}</td>
+      <td>${item.gst_pct}%</td>
+      <td class="fw-mono" style="color:#0F6E56">${fmt(item.cgst)}</td>
+      <td class="fw-mono" style="color:#185FA5">${fmt(item.sgst)}</td>
+      <td>${item.disc_type} ${item.disc_val}</td>
+      <td class="fw-mono"><strong>${fmt(item.final)}</strong></td>
+    </tr>`).join('');
+
+  updateTotals();
+  if (currentPaymentMode === 'Split') updateSplitBalance();
+
+  const badge = document.getElementById('cartBadge');
+  if (cart.length > 0) {
+    badge.style.display = 'inline';
+    badge.textContent   = cart.length + ' item' + (cart.length > 1 ? 's' : '');
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function updateTotals() {
+  let subtotal = 0, totalGst = 0;
+  cart.forEach(item => {
+    const c = calc(item.unit_price, item.qty, item.gst_pct, item.disc_type, item.disc_val);
+    subtotal += c.after;
+    totalGst += c.gst;
+  });
+  document.getElementById('totSubtotal').textContent = fmt(subtotal);
+  document.getElementById('totGst').textContent      = fmt(totalGst);
+  document.getElementById('totGrand').textContent    = fmt(subtotal + totalGst);
+}
+
+function removeSelected() {
+  const sel = document.querySelector('#cartBody tr.selected');
+  if (!sel) return showToast('Click a cart row to select it first.', 'warning');
+  const idx = parseInt(sel.dataset.idx);
+  if (cart[idx].qty > 1) cart[idx].qty--;
+  else cart.splice(idx, 1);
+  renderCart();
+}
+
+function clearCart() {
+  if (cart.length && !confirm('Clear all items from cart?')) return;
+  cart = [];
+  renderCart();
+}
+
+// Row selection
+document.addEventListener('click', e => {
+  const row = e.target.closest('#cartBody tr');
+  if (!row) return;
+  document.querySelectorAll('#cartBody tr').forEach(r => r.classList.remove('selected'));
+  row.classList.add('selected');
+});
+
+// ════════════════════════════════════════════════════════════
+//  HOLD BILL
+// ════════════════════════════════════════════════════════════
+async function holdBill() {
+  if (!cart.length) return showToast('Cart is empty.', 'warning');
+  const note    = prompt('Note for this held bill (optional):') || '';
+  const custSel = document.getElementById('custSelect');
+  const custOpt = custSel.options[custSel.selectedIndex];
+  const custName = (custSel.value && custSel.value !== '__new__')
+    ? (custOpt.textContent.split(' - ')[1] || custOpt.textContent)
+    : 'Walk-in';
+  const d = await apiCall('/sales/api/hold-bill', 'POST',
+    { cart, customer_name: custName, note });
+  if (!d) return;
+  showToast(d.message, d.success ? 'success' : 'danger');
+  if (d.success) {
+    clearCart();
+    loadHeldBills();
+    switchTab('tabHeld');
+  }
+}
+
+async function loadHeldBills() {
+  const d = await apiCall('/sales/api/held-bills');
+  if (!d) return;
+  const bills   = d.bills || [];
+  const countEl = document.getElementById('heldCount');
+  countEl.style.display = bills.length ? 'inline' : 'none';
+  if (bills.length) countEl.textContent = bills.length;
+
+  const container = document.getElementById('heldBillsList');
+  if (!bills.length) {
+    container.innerHTML = `
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-inbox" style="font-size:2rem;opacity:.3"></i>
+        <br>No held bills
+      </div>`;
+    return;
+  }
+  container.innerHTML = bills.map(b => `
+    <div class="card mb-3">
+      <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+        <div style="background:#8E44AD;color:white;border-radius:10px;
+                    padding:8px 14px;font-weight:700;font-size:1.1rem">
+          #${b.bill_id}
+        </div>
+        <div style="flex:1;min-width:120px">
+          <div style="font-weight:600">${b.customer_name}${b.note ? ' — ' + b.note : ''}</div>
+          <div style="font-size:.82rem;color:#888">
+            ${b.items} items &middot; ${b.timestamp} &middot; by ${b.held_by}
+          </div>
+        </div>
+        <div style="font-size:1.1rem;font-weight:700;color:#27AE60">${fmt(b.total)}</div>
+        <button onclick="recallBill('${b.bill_id}')"
+          style="background:#27AE60;color:white;border:none;border-radius:8px;
+                 padding:7px 14px;cursor:pointer;font-weight:600">
+          <i class="bi bi-play-circle"></i> Recall
+        </button>
+        <button onclick="deleteHeldBill('${b.bill_id}')"
+          style="background:#E74C3C;color:white;border:none;border-radius:8px;
+                 padding:7px 10px;cursor:pointer">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+async function recallBill(billId) {
+  const d = await apiCall(`/sales/api/recall-bill/${billId}`);
+  if (!d || !d.success) return showToast(d?.message || 'Error recalling bill.', 'danger');
+  cart = d.bill.cart;
+  renderCart();
+  showToast(`Bill #${billId} recalled.`, 'success');
+  loadHeldBills();
+  switchTab('tabNewSale');
+}
+
+async function deleteHeldBill(billId) {
+  if (!confirm(`Delete held bill #${billId}?`)) return;
+  await apiCall(`/sales/api/delete-held-bill/${billId}`, 'DELETE');
+  loadHeldBills();
+}
+
+// ════════════════════════════════════════════════════════════
+//  CHECKOUT
+// ════════════════════════════════════════════════════════════
+function openCheckout() {
+  if (!cart.length) return showToast('Cart is empty!', 'warning');
+  let subtotal = 0, totalGst = 0;
+  const catGst = {};
+  cart.forEach(item => {
+    const c = calc(item.unit_price, item.qty, item.gst_pct, item.disc_type, item.disc_val);
+    subtotal += c.after;
+    totalGst += c.gst;
+    if (!catGst[item.category])
+      catGst[item.category] = { pct: item.gst_pct, cgst: 0, sgst: 0 };
+    catGst[item.category].cgst += c.cgst;
+    catGst[item.category].sgst += c.sgst;
+  });
+  const grand = Math.round((subtotal + totalGst) * 100) / 100;
+
+  // UPI → dedicated QR modal
+  if (currentPaymentMode === 'UPI') {
+    buildCheckoutPayload(grand);
+    showUPIQRModal(grand);
+    return;
+  }
+
+  // Other modes → summary modal
+  let html = `<table class="ims-table mb-3"><thead>
+    <tr><th>Product</th><th>Qty</th><th>Unit</th>
+        <th>GST%</th><th>CGST</th><th>SGST</th><th>Total</th></tr>
+  </thead><tbody>`;
+  cart.forEach(item => {
+    const c    = calc(item.unit_price, item.qty, item.gst_pct, item.disc_type, item.disc_val);
+    const half = item.gst_pct / 2;
+    html += `<tr>
+      <td>${item.product_name}</td><td>${item.qty}</td>
+      <td>${fmt(item.unit_price)}</td><td>${item.gst_pct}%</td>
+      <td style="color:#0F6E56">${half}%=${fmt(c.cgst)}</td>
+      <td style="color:#185FA5">${half}%=${fmt(c.sgst)}</td>
+      <td><strong>${fmt(c.final)}</strong></td>
+    </tr>`;
+  });
+  html += '</tbody></table><div class="p-3 rounded" style="background:#F8FAFC">';
+  Object.entries(catGst).forEach(([cat, v]) => {
+    const half = v.pct / 2;
+    html += `<div style="font-size:.85rem;margin-bottom:4px">
+      ${cat} (${v.pct}%): CGST ${half}%=${fmt(v.cgst)} SGST ${half}%=${fmt(v.sgst)}
+    </div>`;
+  });
+  html += `<hr class="my-2"/>
+    <div>Subtotal: <strong>${fmt(subtotal)}</strong></div>
+    <div>Total GST: <strong style="color:#E67E22">${fmt(totalGst)}</strong></div>
+    <div style="font-size:1.2rem;color:#27AE60;font-weight:700;margin-top:6px">
+      Grand Total: ${fmt(grand)}
+    </div>
+    <div style="margin-top:6px">
+      <span style="background:#1ABC9C;color:white;padding:3px 10px;
+                   border-radius:20px;font-size:.88rem;font-weight:600">
+        Payment: ${currentPaymentMode}
+      </span>
+    </div>`;
+  if (currentPaymentMode === 'Split') {
+    const cash = parseFloat(document.getElementById('splitCash').value) || 0;
+    const upi  = parseFloat(document.getElementById('splitUPI').value)  || 0;
+    const card = parseFloat(document.getElementById('splitCard').value) || 0;
+    html += `<div style="font-size:.85rem;margin-top:6px">
+      Cash: ${fmt(cash)} | UPI: ${fmt(upi)} | Card: ${fmt(card)}
+    </div>`;
+  }
+  html += '</div>';
+  document.getElementById('checkoutBody').innerHTML = html;
+  new bootstrap.Modal(document.getElementById('checkoutModal')).show();
+}
+
+function _getCustomerFields() {
+  const custSel = document.getElementById('custSelect');
+  const custOpt = custSel.options[custSel.selectedIndex];
+  let custName = 'Walk-in', custPhone = '', custEmail = '';
+  if (custSel.value && custSel.value !== '__new__') {
+    custName  = custOpt.textContent.split(' - ')[1] || custOpt.textContent;
+    custPhone = custOpt.dataset.phone || '';
+    custEmail = custOpt.dataset.email || '';
+  }
+  return { custName, custPhone, custEmail };
+}
+
+function buildCheckoutPayload(grand) {
+  const { custName, custPhone, custEmail } = _getCustomerFields();
+  pendingCheckoutPayload = {
+    cart: cart.map(item => ({
+      product_id:   item.product_id,
+      product_name: item.product_name,
+      category:     item.category,
+      qty:          item.qty,
+      unit_price:   item.unit_price,
+      gst_pct:      item.gst_pct,
+      disc_type:    item.disc_type,
+      disc_val:     item.disc_val,
+    })),
+    customer_name:  custName,
+    customer_phone: custPhone,
+    customer_email: custEmail,
+    payment_mode:   'UPI',
+    cash_amount:    0,
+    upi_amount:     grand,
+    card_amount:    0,
+  };
+}
+
+async function _postCheckout(payload) {
+  const d = await apiCall('/sales/api/checkout', 'POST', payload);
+  if (!d) return;
+
+  if (d.success) {
+    showToast(d.message, 'success');
+    window.open(`/sales/invoice/${d.invoice_file}`, '_blank');
+    cart = [];
+    renderCart();
+    await loadProducts();
+    loadCustomers();
+    loadHistory();
+  } else {
+    if (d.stock_conflict) {
+      handleStockConflict(d.product_id, d.available, d.message);
+    } else {
+      showToast(d.message, 'danger');
+    }
+  }
+}
+
+async function confirmCheckout() {
+  bootstrap.Modal.getInstance(document.getElementById('checkoutModal')).hide();
+  const { custName, custPhone, custEmail } = _getCustomerFields();
+  const payload = {
+    cart: cart.map(item => ({
+      product_id:   item.product_id,
+      product_name: item.product_name,
+      category:     item.category,
+      qty:          item.qty,
+      unit_price:   item.unit_price,
+      gst_pct:      item.gst_pct,
+      disc_type:    item.disc_type,
+      disc_val:     item.disc_val,
+    })),
+    customer_name:  custName,
+    customer_phone: custPhone,
+    customer_email: custEmail,
+    payment_mode:   currentPaymentMode,
+    cash_amount:    parseFloat(document.getElementById('splitCash')?.value) || 0,
+    upi_amount:     parseFloat(document.getElementById('splitUPI')?.value)  || 0,
+    card_amount:    parseFloat(document.getElementById('splitCard')?.value) || 0,
+  };
+  await _postCheckout(payload);
+}
+
+// ════════════════════════════════════════════════════════════
+//  UPI QR MODAL
+// ════════════════════════════════════════════════════════════
+function buildUPIString(amount) {
+  const a    = amount.toFixed(2);
+  const name = encodeURIComponent(UPI_CONFIG.payeeName);
+  const tn   = encodeURIComponent('Payment to ' + UPI_CONFIG.payeeName);
+  return `upi://pay?pa=${UPI_CONFIG.upiId}&pn=${name}&am=${a}&cu=${UPI_CONFIG.currency}&tn=${tn}`;
+}
+
+function showUPIQRModal(amount) {
+  document.getElementById('upiAmountDisplay').textContent = '₹' + amount.toFixed(2);
+  document.getElementById('upiIdDisplay').textContent     = UPI_CONFIG.upiId;
+
+  const container = document.getElementById('upiQRCode');
+  container.innerHTML = '';
+  if (upiQRInstance) { try { upiQRInstance.clear(); } catch (e) {} upiQRInstance = null; }
+
+  try {
+    upiQRInstance = new QRCode(container, {
+      text:         buildUPIString(amount),
+      width:        200,
+      height:       200,
+      colorDark:    '#1E1B4B',
+      colorLight:   '#FFFFFF',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  } catch (e) {
+    container.innerHTML = `<div style="color:#E74C3C;font-size:.8rem;padding:10px">
+      QR generation failed.<br>Pay directly to UPI ID.
+    </div>`;
+  }
+
+  startUPITimer();
+  new bootstrap.Modal(document.getElementById('upiQRModal')).show();
+}
+
+function startUPITimer() {
+  if (upiTimerInterval) clearInterval(upiTimerInterval);
+  upiTimerSeconds = 300;
+  updateTimerDisplay();
+  upiTimerInterval = setInterval(() => {
+    upiTimerSeconds--;
+    updateTimerDisplay();
+    if (upiTimerSeconds <= 0) {
+      clearInterval(upiTimerInterval);
+      const el = document.getElementById('upiTimer');
+      if (el) { el.textContent = 'Expired'; el.style.color = '#DC2626'; }
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m  = String(Math.floor(upiTimerSeconds / 60)).padStart(2, '0');
+  const s  = String(upiTimerSeconds % 60).padStart(2, '0');
+  const el = document.getElementById('upiTimer');
+  if (el) {
+    el.textContent = `${m}:${s}`;
+    el.style.color = upiTimerSeconds <= 60 ? '#DC2626' : '#B45309';
+  }
+}
+
+function refreshUPIQR() {
+  const amtText = document.getElementById('upiAmountDisplay').textContent.replace(/[^0-9.]/g, '');
+  const amount  = parseFloat(amtText) || 0;
+  const container = document.getElementById('upiQRCode');
+  container.innerHTML = '<div style="color:#94A3B8;font-size:.8rem">Refreshing…</div>';
+  if (upiQRInstance) { try { upiQRInstance.clear(); } catch (e) {} upiQRInstance = null; }
+  setTimeout(() => {
+    container.innerHTML = '';
+    try {
+      upiQRInstance = new QRCode(container, {
+        text: buildUPIString(amount), width: 200, height: 200,
+        colorDark: '#1E1B4B', colorLight: '#FFFFFF',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    } catch (e) {
+      container.innerHTML = `<div style="color:#E74C3C;font-size:.8rem;padding:10px">
+        QR generation failed.
+      </div>`;
+    }
+    startUPITimer();
+  }, 300);
+}
+
+function copyUPIId() {
+  navigator.clipboard.writeText(UPI_CONFIG.upiId).then(() => {
+    const icon = document.getElementById('upiCopyIcon');
+    icon.className   = 'bi bi-clipboard-check';
+    icon.style.color = '#16A34A';
+    setTimeout(() => { icon.className = 'bi bi-clipboard'; icon.style.color = ''; }, 2000);
+    showToast('UPI ID copied!', 'success');
+  });
+}
+
+function cancelUPIPayment() {
+  if (upiTimerInterval) clearInterval(upiTimerInterval);
+  pendingCheckoutPayload = null;
+  const modal = bootstrap.Modal.getInstance(document.getElementById('upiQRModal'));
+  if (modal) modal.hide();
+}
+
+async function confirmUPIPaymentDone() {
+  if (!pendingCheckoutPayload) return showToast('No pending payment.', 'warning');
+  if (upiTimerInterval) clearInterval(upiTimerInterval);
+
+  const modal = bootstrap.Modal.getInstance(document.getElementById('upiQRModal'));
+  if (modal) modal.hide();
+
+  showToast('Processing UPI payment…', 'info');
+  const payload = pendingCheckoutPayload;
+  pendingCheckoutPayload = null;
+  await _postCheckout(payload);
+}
+
+// ════════════════════════════════════════════════════════════
+//  HISTORY
+//  Now shows payment_mode column (new SalesMaster field)
+// ════════════════════════════════════════════════════════════
+async function loadHistory() {
+  const d = await apiCall('/sales/api/history');
+  if (!d) return;
+  renderRows('histBody', d.sales, s => `
+    <td class="fw-mono">#${s.sale_id}</td>
+    <td style="font-size:.8rem">${s.date}</td>
+    <td>${s.sold_by}</td>
+    <td>${s.customer_name}</td>
+    <td style="font-size:.8rem">${s.customer_phone || '—'}</td>
+    <td class="fw-mono">${fmt(s.subtotal)}</td>
+    <td class="fw-mono">${fmt(s.total_gst)}</td>
+    <td class="fw-mono"><strong>${fmt(s.grand_total)}</strong></td>
+    <td>
+      <span style="background:#E0F2FE;color:#0369A1;padding:2px 8px;
+                   border-radius:20px;font-size:.78rem;font-weight:600">
+        ${s.payment_mode || 'Cash'}
+      </span>
+    </td>
+  `);
+}
+
+// ════════════════════════════════════════════════════════════
+//  RETURNS
+// ════════════════════════════════════════════════════════════
+async function loadRecentSales() {
+  const d = await apiCall('/sales/api/recent-sales');
+  if (!d) return;
+  const sel = document.getElementById('retSaleSelect');
+  sel.innerHTML = '<option value="">— Select a sale —</option>' +
+    (d.sales || []).map(s =>
+      `<option value="${s.sale_id}">${s.label}</option>`
+    ).join('');
+}
+
+async function loadSaleItems() {
+  const sid = document.getElementById('retSaleSelect').value;
+  retItems  = [];
+  if (!sid) { document.getElementById('retItemBody').innerHTML = ''; return; }
+  const d = await apiCall(`/sales/api/sale-items/${sid}`);
+  if (!d) return;
+  retItems = (d.items || []).map(i => ({ ...i, refund_qty: 0 }));
+  renderRetItems();
+}
+
+function renderRetItems() {
+  renderRows('retItemBody', retItems, (item, i) => `
+    <td>${item.product_name}</td>
+    <td>${item.quantity}</td>
+    <td class="fw-mono">${fmt(item.mrp)}</td>
+    <td>
+      <input type="number" min="0" max="${item.quantity}" value="0"
+        style="width:70px;border:1px solid #ddd;border-radius:6px;padding:3px 6px"
+        onfocus="pauseScanner()" onblur="resumeScanner()"
+        onchange="retItems[${i}].refund_qty = parseInt(this.value) || 0"/>
+    </td>
+    <td class="fw-mono">₹0.00</td>
+  `);
+}
+
+async function processReturn() {
+  const sid    = document.getElementById('retSaleSelect').value;
+  const reason = document.getElementById('retReason').value.trim();
+  if (!sid)    return showToast('Select a sale.', 'warning');
+  if (!reason) return showToast('Reason is required.', 'warning');
+  const refunds = retItems
+    .filter(i => i.refund_qty > 0)
+    .map(i => ({ sale_id: sid, product_id: i.product_id, qty: i.refund_qty }));
+  if (!refunds.length) return showToast('Enter refund quantities.', 'warning');
+  const d = await apiCall('/sales/api/process-return', 'POST', { refunds, reason });
+  if (!d) return;
+  showToast(d.message, d.success ? 'success' : 'danger');
+  if (d.success) {
+    loadReturnHistory();
+    loadSaleItems();
+    loadProducts();
+  }
+}
+
+async function loadReturnHistory() {
+  const d = await apiCall('/sales/api/return-history');
+  if (!d) return;
+  renderRows('retHistBody', d.returns, r => `
+    <td class="fw-mono">${r.return_id}</td>
+    <td class="fw-mono">#${r.sale_id}</td>
+    <td>${r.product_id}</td>
+    <td>${r.quantity}</td>
+    <td class="fw-mono">${fmt(r.refund_amount)}</td>
+    <td>${r.date}</td>
+    <td style="font-size:.82rem">${r.reason}</td>
+  `);
+}
+
+// ════════════════════════════════════════════════════════════
+//  TAB SWITCHER
+// ════════════════════════════════════════════════════════════
+function switchTab(tabId) {
+  document.querySelectorAll('.ims-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.ims-tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector(`[data-tab="${tabId}"]`);
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById(tabId);
+  if (pane) pane.classList.add('active');
+}
+
+document.querySelectorAll('.ims-tab').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadProducts();
+  await loadCustomers();
+  await loadUPIConfig();
+  loadHistory();
+  loadRecentSales();
+  loadReturnHistory();
+  loadHeldBills();
+  setTimeout(refocusScanner, 300);
+});
+</script>
+{% endblock %}

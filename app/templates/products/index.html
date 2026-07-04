@@ -1,0 +1,678 @@
+{% extends "base.html" %}
+{% block title %}Products{% endblock %}
+{% block page_title %}<i class="bi bi-box-seam-fill me-2 text-primary-ims"></i>Products{% endblock %}
+
+{% block content %}
+
+<!-- ── Toolbar ─────────────────────────────────────────────── -->
+<div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+  <input class="search-input" id="searchQ" placeholder="Search name / SKU / category / supplier…"
+         oninput="loadList()" style="max-width:320px"/>
+  <button class="btn-ims btn-ghost-ims" onclick="resetSearch()">
+    <i class="bi bi-x-lg"></i> Reset
+  </button>
+  <button class="btn-ims btn-ghost-ims" onclick="showAuditLog()">
+    <i class="bi bi-journal-text"></i> Audit Log
+  </button>
+  <div class="ms-auto d-flex align-items-center gap-2">
+    <span class="fw-mono" id="totalValueLbl"
+          style="font-size:.8rem;color:#8898aa"></span>
+    {% if current_user.role == 'Admin' %}
+    <button class="btn-ims btn-ghost-ims" onclick="toggleGST()" id="gstBtn">
+      <i class="bi bi-percent"></i> GST Manager
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Products table ──────────────────────────────────────── -->
+<div class="card mb-4">
+  <div style="overflow-x:auto">
+    <table class="ims-table" id="prodTable">
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Name</th>
+          <th>Category</th>
+          <th>Supplier</th>
+          <th>Qty</th>
+          <th>Cost (₹)</th>
+          <th>Unit Price (₹)</th>
+          <th>GST%</th>
+          <th>Reorder</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody id="prodBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── GST Manager (Admin only) ────────────────────────────── -->
+{% if current_user.role == 'Admin' %}
+<div class="gst-panel mb-4" id="gstPanel" style="display:none">
+  <div class="gst-panel-title">
+    <i class="bi bi-percent me-1"></i>GST Manager — Admin Only
+  </div>
+  <div class="row g-3">
+    <div class="col-md-8">
+      <table class="ims-table" id="gstTable">
+        <thead>
+          <tr><th>Category</th><th>GST %</th><th></th></tr>
+        </thead>
+        <tbody id="gstBody"></tbody>
+      </table>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label-ims">Category</label>
+      <input class="form-control-ims w-100 mb-2" id="gCat" placeholder="Category name"/>
+      <label class="form-label-ims">GST %</label>
+      <input class="form-control-ims w-100 mb-3" id="gPct" type="number" placeholder="e.g. 18"/>
+      <div class="d-flex gap-2">
+        <button class="btn-ims btn-success-ims" onclick="saveGST()">
+          <i class="bi bi-check-lg"></i> Save
+        </button>
+        <button class="btn-ims btn-danger-ims" onclick="deleteGST()">
+          <i class="bi bi-trash"></i> Delete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Add / Edit form ─────────────────────────────────────── -->
+<div class="form-section">
+  <div class="section-title">
+    <i class="bi bi-pencil-square me-1"></i>Add / Edit Product
+  </div>
+  <div class="row g-3">
+
+    <!-- SKU -->
+    <div class="col-md-2">
+      <label class="form-label-ims">SKU</label>
+      <div class="d-flex gap-1">
+        <input class="form-control-ims flex-fill" id="fPid" placeholder="SKU"/>
+        <button class="btn-ims btn-ghost-ims" onclick="autoId()" title="Auto-generate SKU">
+          <i class="bi bi-magic"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Name -->
+    <div class="col-md-4">
+      <label class="form-label-ims">Product Name</label>
+      <input class="form-control-ims w-100" id="fName" placeholder="Product name"/>
+    </div>
+
+    <!-- Category -->
+    <div class="col-md-3">
+      <label class="form-label-ims">Category</label>
+      <input class="form-control-ims w-100" id="fCategory"
+             list="catOptions" placeholder="Select or type category"/>
+      <datalist id="catOptions"></datalist>
+    </div>
+
+    <!-- Supplier -->
+    <div class="col-md-3">
+      <label class="form-label-ims">Supplier</label>
+      <select class="form-control-ims w-100" id="fSupplier">
+        <option value="">— Select Supplier —</option>
+      </select>
+    </div>
+
+    <!-- Quantity -->
+    <div class="col-md-2">
+      <label class="form-label-ims">Quantity</label>
+      <input class="form-control-ims w-100" id="fQty"
+             type="number" value="0" min="0"/>
+    </div>
+
+    <!-- Cost Price -->
+    <div class="col-md-2">
+      <label class="form-label-ims">Cost Price (₹)</label>
+      <input class="form-control-ims w-100" id="fCost"
+             type="number" value="0.00" step="0.01" min="0"/>
+    </div>
+
+    <!-- Unit Price -->
+    <div class="col-md-2">
+      <label class="form-label-ims">Unit Price (₹)</label>
+      <input class="form-control-ims w-100" id="fPrice"
+             type="number" value="0.00" step="0.01" min="0"/>
+    </div>
+
+    <!-- Reorder Level -->
+    <div class="col-md-2">
+      <label class="form-label-ims">Reorder Level</label>
+      <input class="form-control-ims w-100" id="fReorder"
+             type="number" value="0" min="0"/>
+    </div>
+
+  </div>
+
+  <!-- Action buttons -->
+  <div class="d-flex gap-2 mt-3 flex-wrap">
+    <button class="btn-ims btn-success-ims" onclick="saveProduct()">
+      <i class="bi bi-check-lg"></i> Save
+    </button>
+    <button class="btn-ims btn-danger-ims" onclick="deleteProduct()">
+      <i class="bi bi-trash"></i> Delete
+    </button>
+    <button class="btn-ims btn-ghost-ims" onclick="clearForm()">
+      <i class="bi bi-x-circle"></i> Clear
+    </button>
+    <button onclick="openBarcodeModal()"
+            style="background:#2980B9;color:white;border:none;border-radius:8px;
+                   padding:7px 14px;cursor:pointer;font-size:.85rem;font-weight:600;
+                   display:inline-flex;align-items:center;gap:6px">
+      <i class="bi bi-upc-scan"></i> Barcode
+    </button>
+    <button onclick="document.getElementById('bulkImportModal').style.display='flex'"
+            style="background:#8E44AD;color:white;border:none;border-radius:8px;
+                   padding:7px 14px;cursor:pointer;font-size:.85rem;font-weight:600;
+                   display:inline-flex;align-items:center;gap:6px">
+      <i class="bi bi-file-earmark-excel"></i> Bulk Import
+    </button>
+    <button class="btn-ims btn-ghost-ims ms-auto"
+            onclick="exportTableCSV('prodTable','products.csv')">
+      <i class="bi bi-download"></i> CSV
+    </button>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     BARCODE MODAL
+═════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="barcodeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-upc-scan me-2"></i>Barcode Generator
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center" id="barcodeModalBody">
+        <div class="text-muted">
+          Load a product into the form, then click <strong>Barcode</strong>.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="me-auto d-flex align-items-center gap-2">
+          <label style="font-size:.85rem;font-weight:600">Copies:</label>
+          <input type="number" id="barcodeCopies" value="1" min="1" max="100"
+                 style="width:70px;border:1px solid #ddd;border-radius:6px;
+                        padding:4px 8px"/>
+        </div>
+        <button onclick="printBarcodeSheet()"
+                style="background:#27AE60;color:white;border:none;border-radius:8px;
+                       padding:7px 16px;cursor:pointer;font-weight:600">
+          <i class="bi bi-printer"></i> Print Sheet (A4)
+        </button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     BULK IMPORT MODAL
+═════════════════════════════════════════════════════════════ -->
+<div id="bulkImportModal"
+     style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+            background:rgba(0,0,0,.5);z-index:9999;
+            align-items:center;justify-content:center">
+  <div style="background:white;border-radius:16px;padding:28px;
+              width:520px;max-width:95vw">
+
+    <div style="display:flex;justify-content:space-between;
+                align-items:center;margin-bottom:16px">
+      <h5 style="margin:0">
+        <i class="bi bi-file-earmark-excel me-2" style="color:#8E44AD"></i>
+        Bulk Import Products
+      </h5>
+      <button onclick="document.getElementById('bulkImportModal').style.display='none'"
+              style="background:none;border:none;font-size:1.4rem;
+                     cursor:pointer;color:#888">&times;</button>
+    </div>
+
+    <div style="background:#F8FAFC;border-radius:8px;padding:12px;
+                margin-bottom:16px;font-size:.85rem">
+      <b>Required columns:</b> product_id, name, category, supplier_id,
+      quantity, cost_price, unit_price, reorder_level
+    </div>
+
+    <div class="d-flex gap-2 mb-3">
+      <a href="/products/api/bulk-import-template"
+         style="background:#27AE60;color:white;border:none;border-radius:8px;
+                padding:7px 14px;cursor:pointer;font-size:.85rem;
+                font-weight:600;text-decoration:none;
+                display:inline-flex;align-items:center;gap:6px">
+        <i class="bi bi-download"></i> Download Template
+      </a>
+    </div>
+
+    <!-- Drop zone -->
+    <div style="border:2px dashed #ddd;border-radius:8px;padding:24px;
+                text-align:center;margin-bottom:16px;cursor:pointer"
+         onclick="document.getElementById('bulkFile').click()"
+         ondragover="event.preventDefault()"
+         ondrop="handleDrop(event)">
+      <i class="bi bi-cloud-upload"
+         style="font-size:2rem;color:#8E44AD;display:block;margin-bottom:8px"></i>
+      <div style="font-weight:600">Drop Excel file here or click to browse</div>
+      <div style="font-size:.8rem;color:#888">.xlsx or .xls files only</div>
+      <input type="file" id="bulkFile" accept=".xlsx,.xls"
+             style="display:none" onchange="uploadBulkFile(this.files[0])"/>
+    </div>
+
+    <div id="bulkResult" style="display:none"></div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     AUDIT LOG MODAL
+═════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="auditModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-journal-text me-2"></i>Audit Log
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0" style="max-height:520px;overflow-y:auto">
+        <div class="d-flex gap-2 p-3 border-bottom flex-wrap">
+          <select class="form-control-ims" id="auditActionFilter"
+                  style="width:140px">
+            <option value="ALL">All Actions</option>
+            <option value="ADD">ADD</option>
+            <option value="EDIT">EDIT</option>
+            <option value="DELETE">DELETE</option>
+          </select>
+          <input class="form-control-ims" id="auditPidFilter"
+                 placeholder="Filter by SKU…" style="width:180px"/>
+          <button class="btn-ims btn-primary-ims" onclick="loadAuditLog()">
+            <i class="bi bi-funnel"></i> Filter
+          </button>
+        </div>
+        <table class="ims-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Timestamp</th>
+              <th>User</th>
+              <th>Action</th>
+              <th>SKU</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="auditBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+/* ═══════════════════════════════════════════════════════════
+   PRODUCT LIST
+═══════════════════════════════════════════════════════════ */
+async function loadList() {
+  const q = document.getElementById('searchQ').value;
+  const d = await apiCall(`/products/api/list?q=${encodeURIComponent(q)}`);
+  if (!d) return;
+
+  document.getElementById('totalValueLbl').textContent =
+    'Inventory: ' + fmt(d.total_inventory_value);
+
+  renderRows('prodBody', d.products, (p) => {
+    const low = p.is_low_stock;
+    const created = p.created_at ? p.created_at.replace('T', ' ').substring(0, 16) : '';
+    return `
+      <td class="fw-mono">${esc(p.product_id)}</td>
+      <td><strong>${esc(p.name)}</strong></td>
+      <td>${esc(p.category)}</td>
+      <td>${esc(p.supplier_name)}</td>
+      <td>
+        <span class="badge ${low ? 'badge-low' : 'badge-ok'}">${p.quantity}</span>
+      </td>
+      <td class="fw-mono">${fmt(p.cost_price)}</td>
+      <td class="fw-mono">${fmt(p.unit_price)}</td>
+      <td>${p.gst}%</td>
+      <td>${p.reorder_level}</td>
+      <td style="font-size:.78rem;color:#999">${created}</td>
+    `;
+  });
+
+  makeSortable('prodTable');
+
+  initRowSelect('prodTable', row => {
+    const c = row.querySelectorAll('td');
+    document.getElementById('fPid').value      = c[0].textContent.trim();
+    document.getElementById('fName').value     = c[1].textContent.trim();
+    document.getElementById('fCategory').value = c[2].textContent.trim();
+    document.getElementById('fQty').value      = c[4].textContent.replace(/[^\d]/g, '');
+    document.getElementById('fCost').value     = c[5].textContent.replace(/[^0-9.]/g, '');
+    document.getElementById('fPrice').value    = c[6].textContent.replace(/[^0-9.]/g, '');
+    document.getElementById('fReorder').value  = c[8].textContent.trim();
+
+    // Match supplier by name fragment
+    const supplierText = c[3].textContent.trim();
+    const sel = document.getElementById('fSupplier');
+    Array.from(sel.options).forEach(o => {
+      if (o.textContent.includes(supplierText)) sel.value = o.value;
+    });
+  });
+}
+
+/* ── auto SKU ────────────────────────────────────────────── */
+async function autoId() {
+  const d = await apiCall('/products/api/next-id');
+  if (d) document.getElementById('fPid').value = d.product_id;
+}
+
+/* ── populate dropdowns ──────────────────────────────────── */
+async function loadSuppliers() {
+  const d = await apiCall('/products/api/suppliers-for-select');
+  if (!d) return;
+  const sel = document.getElementById('fSupplier');
+  sel.innerHTML =
+    '<option value="">— Select Supplier —</option>' +
+    d.suppliers.map(s =>
+      `<option value="${esc(s.supplier_id)}">${esc(s.label)}</option>`
+    ).join('');
+}
+
+async function loadCategories() {
+  const d = await apiCall('/products/api/gst/list');
+  if (!d) return;
+  document.getElementById('catOptions').innerHTML =
+    d.categories.map(c => `<option value="${esc(c.category)}">`).join('');
+}
+
+/* ── save ────────────────────────────────────────────────── */
+async function saveProduct() {
+  const payload = {
+    product_id:    document.getElementById('fPid').value.trim(),
+    name:          document.getElementById('fName').value.trim(),
+    category:      document.getElementById('fCategory').value.trim(),
+    supplier_id:   document.getElementById('fSupplier').value,
+    quantity:      document.getElementById('fQty').value,
+    cost_price:    document.getElementById('fCost').value,
+    unit_price:    document.getElementById('fPrice').value,
+    reorder_level: document.getElementById('fReorder').value,
+  };
+  const d = await apiCall('/products/api/save', 'POST', payload);
+  if (!d) return;
+  showToast(d.message, d.success ? 'success' : 'danger');
+  if (d.success) { clearForm(); loadList(); }
+  else if (d.gst_missing) toggleGST(true);
+}
+
+/* ── delete ──────────────────────────────────────────────── */
+async function deleteProduct() {
+  const pid = document.getElementById('fPid').value.trim();
+  if (!pid) return showToast('Select a product first.', 'warning');
+  if (!confirm2(`Delete product ${pid}?`)) return;
+  const d = await apiCall(`/products/api/delete/${pid}`, 'DELETE');
+  if (d) {
+    showToast(d.message, d.success ? 'success' : 'danger');
+    if (d.success) { clearForm(); loadList(); }
+  }
+}
+
+/* ── clear form ──────────────────────────────────────────── */
+function clearForm() {
+  ['fPid', 'fName', 'fCategory'].forEach(id =>
+    document.getElementById(id).value = ''
+  );
+  document.getElementById('fQty').value      = '0';
+  document.getElementById('fCost').value     = '0.00';
+  document.getElementById('fPrice').value    = '0.00';
+  document.getElementById('fReorder').value  = '0';
+  document.getElementById('fSupplier').value = '';
+}
+
+function resetSearch() {
+  document.getElementById('searchQ').value = '';
+  loadList();
+}
+
+/* ══════════════════════════════════════════════════════════
+   GST MANAGER
+══════════════════════════════════════════════════════════ */
+function toggleGST(forceOpen = false) {
+  const panel = document.getElementById('gstPanel');
+  if (!panel) return;
+  const open = forceOpen || panel.style.display === 'none';
+  panel.style.display = open ? 'block' : 'none';
+  if (open) loadGSTList();
+}
+
+async function loadGSTList() {
+  const d = await apiCall('/products/api/gst/list');
+  if (!d) return;
+  renderRows('gstBody', d.categories, (c) => `
+    <td><strong>${esc(c.category)}</strong></td>
+    <td>${c.gst}%</td>
+    <td>
+      <button class="btn-ims btn-ghost-ims"
+              style="padding:2px 8px;font-size:.8rem"
+              onclick="document.getElementById('gCat').value='${esc(c.category)}';
+                       document.getElementById('gPct').value='${c.gst}'">
+        <i class="bi bi-pencil"></i>
+      </button>
+    </td>
+  `);
+}
+
+async function saveGST() {
+  const cat = document.getElementById('gCat').value.trim();
+  const gst = document.getElementById('gPct').value;
+  if (!cat || gst === '') return showToast('Fill category and GST %.', 'warning');
+  const d = await apiCall('/products/api/gst/save', 'POST',
+    { category: cat, gst: parseFloat(gst) });
+  if (d) {
+    showToast(d.message, d.success ? 'success' : 'danger');
+    if (d.success) { loadGSTList(); loadCategories(); }
+  }
+}
+
+async function deleteGST() {
+  const cat = document.getElementById('gCat').value.trim();
+  if (!cat) return showToast('Select a category first.', 'warning');
+  if (!confirm2(`Delete GST for '${cat}'?`)) return;
+  const d = await apiCall(
+    `/products/api/gst/delete/${encodeURIComponent(cat)}`, 'DELETE');
+  if (d) {
+    showToast(d.message, d.success ? 'success' : 'danger');
+    if (d.success) { loadGSTList(); loadCategories(); }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   AUDIT LOG
+══════════════════════════════════════════════════════════ */
+function showAuditLog() {
+  loadAuditLog();
+  new bootstrap.Modal(document.getElementById('auditModal')).show();
+}
+
+async function loadAuditLog() {
+  const action = document.getElementById('auditActionFilter').value;
+  const pid    = document.getElementById('auditPidFilter').value;
+  const d = await apiCall(
+    `/products/api/audit-log?action=${action}&product_id=${encodeURIComponent(pid)}`
+  );
+  if (!d) return;
+  const colors = { ADD: '#27AE60', EDIT: '#E67E22', DELETE: '#E74C3C' };
+  renderRows('auditBody', d.logs, (r) => `
+    <td class="fw-mono">${r.id}</td>
+    <td class="fw-mono" style="font-size:.8rem">${esc(r.timestamp)}</td>
+    <td>${esc(r.user)}</td>
+    <td>
+      <span style="color:${colors[r.action] || '#666'};font-weight:700">
+        ${esc(r.action)}
+      </span>
+    </td>
+    <td class="fw-mono">${esc(r.product_id)}</td>
+    <td style="font-size:.82rem;color:#666">${esc(r.details)}</td>
+  `);
+}
+
+/* ══════════════════════════════════════════════════════════
+   BARCODE
+══════════════════════════════════════════════════════════ */
+let currentBarcodePid = null;
+
+async function openBarcodeModal() {
+  const pid = document.getElementById('fPid')?.value?.trim();
+  if (!pid) {
+    return showToast('Load a product into the form first.', 'warning');
+  }
+  currentBarcodePid = pid;
+  const body = document.getElementById('barcodeModalBody');
+  body.innerHTML =
+    '<div class="text-center py-3">' +
+    '<div class="spinner-border text-success"></div>' +
+    '<br>Generating barcode…</div>';
+
+  new bootstrap.Modal(document.getElementById('barcodeModal')).show();
+
+  const d = await apiCall(`/products/api/barcode/${pid}`);
+  if (!d || !d.success) {
+    body.innerHTML =
+      `<div class="text-danger">${d?.message || 'Error generating barcode'}</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div style="border:1px solid #eee;border-radius:8px;padding:16px;
+                display:inline-block;width:100%">
+      <iframe src="data:application/pdf;base64,${d.barcode}"
+              style="width:100%;min-height:160px;border:none;display:block"></iframe>
+      <div style="margin-top:8px;font-weight:600;font-size:.9rem">${esc(d.name)}</div>
+      <div style="font-size:.82rem;color:#888">
+        SKU: ${esc(d.product_id)} | ₹${parseFloat(d.price || 0).toFixed(2)}
+      </div>
+    </div>
+    <div class="mt-3">
+      <button onclick="downloadBarcode('${esc(d.product_id)}')"
+              style="background:#2980B9;color:white;border:none;border-radius:8px;
+                     padding:7px 14px;cursor:pointer;font-weight:600">
+        <i class="bi bi-download"></i> Download PDF
+      </button>
+    </div>`;
+}
+
+function downloadBarcode(pid) {
+  const iframe = document.querySelector('#barcodeModalBody iframe');
+  if (!iframe) return;
+  const a = document.createElement('a');
+  a.href = iframe.src;
+  a.download = `barcode_${pid}.pdf`;
+  a.click();
+}
+
+async function printBarcodeSheet() {
+  if (!currentBarcodePid) return showToast('No product selected.', 'warning');
+  const copies = parseInt(document.getElementById('barcodeCopies').value) || 1;
+  showToast('Generating print sheet…', 'info');
+  const d = await apiCall('/products/api/barcode-sheet', 'POST', {
+    product_ids: [currentBarcodePid],
+    copies,
+  });
+  if (!d || !d.success) return showToast(d?.message || 'Error', 'danger');
+
+  const byteChars = atob(d.pdf);
+  const byteArr   = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+  const blob = new Blob([byteArr], { type: 'application/pdf' });
+  window.open(URL.createObjectURL(blob), '_blank');
+  showToast(`Print sheet ready: ${d.count} label(s)`, 'success');
+}
+
+/* ══════════════════════════════════════════════════════════
+   BULK IMPORT
+══════════════════════════════════════════════════════════ */
+function handleDrop(e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) uploadBulkFile(file);
+}
+
+async function uploadBulkFile(file) {
+  if (!file) return;
+  const resultEl = document.getElementById('bulkResult');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML =
+    '<div class="text-center">' +
+    '<div class="spinner-border text-success"></div> Importing…</div>';
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const resp = await fetch('/products/api/bulk-import', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrf() },
+      body: formData,
+    });
+    const d = await resp.json();
+
+    if (d.success) {
+      resultEl.innerHTML = `
+        <div style="background:#D4EDDA;border-radius:8px;padding:12px;color:#155724">
+          <strong><i class="bi bi-check-circle"></i> Import Complete!</strong><br>
+          ✅ Added: <strong>${d.added}</strong> &nbsp;
+          ✏️ Updated: <strong>${d.updated}</strong> &nbsp;
+          ❌ Errors: <strong>${d.errors}</strong>
+          ${d.error_list?.length
+            ? '<div style="margin-top:8px;font-size:.82rem">' +
+              d.error_list.map(e => esc(e)).join('<br>') + '</div>'
+            : ''}
+        </div>`;
+      loadList();
+    } else {
+      resultEl.innerHTML = `
+        <div style="background:#F8D7DA;border-radius:8px;padding:12px;color:#721C24">
+          <strong>Error:</strong> ${esc(d.message)}
+        </div>`;
+    }
+  } catch (err) {
+    resultEl.innerHTML =
+      `<div class="text-danger">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   UTILITY
+══════════════════════════════════════════════════════════ */
+/** Simple HTML-escape to prevent XSS in dynamic content */
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* ── init ─────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  loadList();
+  loadSuppliers();
+  loadCategories();
+});
+</script>
+{% endblock %}

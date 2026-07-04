@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Customers{% endblock %}
+{% block page_title %}<i class="bi bi-person-lines-fill me-2 text-primary-ims"></i>Customers{% endblock %}
+
+{% block content %}
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+  <input class="search-input" id="searchQ" placeholder="Search name / phone / email…"
+         oninput="loadList()" style="max-width:320px"/>
+  <button class="btn-ims btn-ghost-ims" onclick="resetSearch()">
+    <i class="bi bi-x-lg"></i> Reset
+  </button>
+  {% if current_user.role == 'Admin' %}
+  <button class="btn-ims btn-accent-ims ms-auto" onclick="bulkMailModal()">
+    <i class="bi bi-envelope-fill"></i> Bulk Mail
+  </button>
+  {% endif %}
+</div>
+
+<div class="card mb-4">
+  <div style="overflow-x:auto">
+    <table class="ims-table" id="custTable">
+      <thead>
+        <tr><th>ID</th><th>Name</th><th>Phone</th><th>Email</th></tr>
+      </thead>
+      <tbody id="custBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="form-section">
+  <div class="section-title">Add / Edit Customer</div>
+  <div class="row g-3">
+    <div class="col-md-2">
+      <label class="form-label-ims">Customer ID</label>
+      <input class="form-control-ims w-100" id="fCid"/>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label-ims">Name</label>
+      <input class="form-control-ims w-100" id="fCName"/>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label-ims">Phone</label>
+      <input class="form-control-ims w-100" id="fCPhone"/>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label-ims">Email</label>
+      <input class="form-control-ims w-100" id="fCEmail" type="email"/>
+    </div>
+  </div>
+  <div class="d-flex gap-2 mt-3 flex-wrap">
+    <button class="btn-ims btn-success-ims" onclick="saveCust()">
+      <i class="bi bi-check-lg"></i> Save
+    </button>
+    <button class="btn-ims btn-danger-ims" onclick="deleteCust()">
+      <i class="bi bi-trash"></i> Delete
+    </button>
+    <button class="btn-ims btn-ghost-ims" onclick="clearForm()">
+      <i class="bi bi-x-circle"></i> Clear
+    </button>
+    <button onclick="showPurchaseHistory()"
+      style="background:#2980B9;color:white;border:none;border-radius:8px;padding:7px 14px;
+             cursor:pointer;font-size:.85rem;font-weight:600;
+             display:inline-flex;align-items:center;gap:6px">
+      <i class="bi bi-clock-history"></i> Purchase History
+    </button>
+    <button class="btn-ims btn-ghost-ims ms-auto"
+            onclick="exportTableCSV('custTable','customers.csv')">
+      <i class="bi bi-download"></i> CSV
+    </button>
+  </div>
+</div>
+
+<!-- Bulk Mail Modal -->
+<div class="modal fade" id="bulkMailModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-envelope-fill me-2"></i>Bulk Mail to All Customers
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label-ims">Subject</label>
+        <input class="form-control-ims w-100 mb-3" id="mailSubject" placeholder="Email subject"/>
+        <label class="form-label-ims">Message</label>
+        <textarea class="form-control-ims w-100" id="mailBody" rows="6"
+                  placeholder="Your message…" style="resize:vertical"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-ims btn-success-ims" onclick="sendBulkMail()">
+          <i class="bi bi-send"></i> Send
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Purchase History Modal -->
+<div class="modal fade" id="purchaseHistoryModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-clock-history me-2"></i>Customer Purchase History
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="purchaseHistoryBody"
+           style="max-height:70vh;overflow-y:auto"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadList() {
+  const q = document.getElementById('searchQ').value;
+  const d = await apiCall(`/customers/api/list?q=${encodeURIComponent(q)}`);
+  if (!d) return;
+  renderRows('custBody', d.customers, (c, i) => `
+    <td class="fw-mono">${c.customer_id}</td>
+    <td><strong>${c.name}</strong></td>
+    <td>${c.phone || ''}</td>
+    <td>${c.email || ''}</td>
+  `);
+  makeSortable('custTable');
+  initRowSelect('custTable', row => {
+    const c = row.querySelectorAll('td');
+    document.getElementById('fCid').value    = c[0].textContent;
+    document.getElementById('fCName').value  = c[1].textContent;
+    document.getElementById('fCPhone').value = c[2].textContent;
+    document.getElementById('fCEmail').value = c[3].textContent;
+  });
+}
+
+async function saveCust() {
+  const d = await apiCall('/customers/api/save', 'POST', {
+    customer_id: document.getElementById('fCid').value.trim(),
+    name:        document.getElementById('fCName').value.trim(),
+    phone:       document.getElementById('fCPhone').value.trim(),
+    email:       document.getElementById('fCEmail').value.trim(),
+  });
+  if (d) {
+    showToast(d.message, d.success ? 'success' : 'danger');
+    if (d.success) { clearForm(); loadList(); }
+  }
+}
+
+async function deleteCust() {
+  const cid = document.getElementById('fCid').value.trim();
+  if (!cid) return showToast('Select a customer.', 'warning');
+  if (!confirm2(`Delete customer ${cid}?`)) return;
+  const d = await apiCall(`/customers/api/delete/${cid}`, 'DELETE');
+  if (d) { showToast(d.message, d.success?'success':'danger'); clearForm(); loadList(); }
+}
+
+function clearForm() {
+  ['fCid','fCName','fCPhone','fCEmail'].forEach(id =>
+    document.getElementById(id).value = '');
+}
+
+function resetSearch() {
+  document.getElementById('searchQ').value = '';
+  loadList();
+}
+
+function bulkMailModal() {
+  new bootstrap.Modal(document.getElementById('bulkMailModal')).show();
+}
+
+async function sendBulkMail() {
+  const d = await apiCall('/customers/api/bulk-mail', 'POST', {
+    subject: document.getElementById('mailSubject').value.trim(),
+    body:    document.getElementById('mailBody').value.trim(),
+  });
+  if (d) {
+    showToast(d.message, d.success ? 'success' : 'danger');
+    if (d.success)
+      bootstrap.Modal.getInstance(document.getElementById('bulkMailModal')).hide();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadList);
+
+// ══════════════════════════════════════════════════════════
+// CUSTOMER PURCHASE HISTORY  — uses /api/history/<cid>
+// Response shape: { success, customer, total_spent, visits,
+//                   segment, top_product, top_category, history[] }
+// history[] item: { sale_id, date, total }
+// ══════════════════════════════════════════════════════════
+
+async function showPurchaseHistory() {
+  const cid = document.getElementById('fCid').value.trim();
+  if (!cid) return showToast('Select a customer first.', 'warning');
+
+  const d = await apiCall(`/customers/api/history/${cid}`);
+  if (!d || !d.success) return showToast(d?.message || 'Error', 'danger');
+
+  const c    = d.customer;
+  const hist = d.history || [];
+
+  let html = `
+    <div style="background:#E8F5E9;border-radius:8px;padding:12px;margin-bottom:16px">
+      <strong>${c.name}</strong>
+      | ${c.phone || '—'}
+      | ${c.email || '—'}<br>
+      <span style="font-size:.85rem">
+        Segment: <strong>${d.segment}</strong> &nbsp;|&nbsp;
+        Total Visits: <strong>${d.visits}</strong> &nbsp;|&nbsp;
+        Total Spent: <strong style="color:#27AE60">₹${parseFloat(d.total_spent).toFixed(2)}</strong>
+        ${d.top_product ? `&nbsp;|&nbsp; Top Product: <strong>${d.top_product}</strong>` : ''}
+        ${d.top_category ? `&nbsp;|&nbsp; Top Category: <strong>${d.top_category}</strong>` : ''}
+      </span>
+    </div>`;
+
+  if (!hist.length) {
+    html += '<div class="text-muted text-center py-4">No purchase history found.</div>';
+  } else {
+    hist.forEach(sale => {
+      html += `
+        <div style="border:1px solid #e3e6ef;border-radius:8px;
+                    margin-bottom:12px;overflow:hidden">
+          <div style="background:#F8FAFC;padding:10px 14px;
+                      display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:700">Sale #${sale.sale_id} — ${sale.date}</span>
+            <span style="font-weight:700;color:#27AE60;font-size:1.05rem">
+              ₹${parseFloat(sale.total).toFixed(2)}
+            </span>
+          </div>
+        </div>`;
+    });
+  }
+
+  document.getElementById('purchaseHistoryBody').innerHTML = html;
+  new bootstrap.Modal(document.getElementById('purchaseHistoryModal')).show();
+}
+</script>
+{% endblock %}
