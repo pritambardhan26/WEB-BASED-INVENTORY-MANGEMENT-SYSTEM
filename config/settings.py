@@ -1,18 +1,36 @@
 import os
+import secrets
+import warnings
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
 load_dotenv()
 
-_user = os.getenv("MYSQL_USER",     "root")
-_pw   = os.getenv("MYSQL_PASSWORD", "Pb@pritam#PB")
-_host = os.getenv("MYSQL_HOST",     "localhost")
-_port = os.getenv("MYSQL_PORT",     "3306")
-_db   = os.getenv("MYSQL_DB",       "ims_db")
+_user = os.getenv("MYSQL_USER", "root")
+_pw   = os.getenv("MYSQL_PASSWORD")
+_host = os.getenv("MYSQL_HOST", "localhost")
+_port = os.getenv("MYSQL_PORT", "3306")
+_db   = os.getenv("MYSQL_DB",   "ims_db")
+
+if not _pw:
+    raise RuntimeError(
+        "MYSQL_PASSWORD is not set. Add it to your .env file "
+        "(see .env.example) — no default credential is provided."
+    )
+
+_secret_key = os.getenv("SECRET_KEY")
+if not _secret_key:
+    _secret_key = secrets.token_hex(32)
+    warnings.warn(
+        "SECRET_KEY is not set in the environment — using a randomly "
+        "generated key for this process only. Set SECRET_KEY in your "
+        ".env file for persistent sessions and in production.",
+        RuntimeWarning,
+    )
 
 
 class Config:
-    SECRET_KEY       = os.getenv("SECRET_KEY", "ims-lalbagh-secret-2024-xyz")
+    SECRET_KEY       = _secret_key
     WTF_CSRF_ENABLED = True
 
     SQLALCHEMY_DATABASE_URI = (
@@ -25,13 +43,11 @@ class Config:
         "pool_recycle":  300,
     }
 
-    MAIL_SERVER         = os.getenv("MAIL_SERVER",  "smtp.gmail.com")
-    MAIL_PORT           = int(os.getenv("MAIL_PORT", "465"))
-    MAIL_USE_TLS        = False
-    MAIL_USE_SSL        = True
-    MAIL_USERNAME       = os.getenv("MAIL_USERNAME", "lalbaghenterprises@gmail.com")
-    MAIL_PASSWORD       = os.getenv("MAIL_PASSWORD", "lojn yuaa tcfn rqxa")
-    MAIL_DEFAULT_SENDER = os.getenv("MAIL_USERNAME", "lalbaghenterprises@gmail.com")
+    # ── Mailjet (API-based mail sending, replaces SMTP) ────────
+    MAILJET_API_KEY      = os.getenv("MAILJET_API_KEY", "")
+    MAILJET_API_SECRET   = os.getenv("MAILJET_API_SECRET", "")
+    MAILJET_SENDER_EMAIL = os.getenv("MAILJET_SENDER_EMAIL", "lalbaghenterprises@gmail.com")
+    MAILJET_SENDER_NAME  = os.getenv("MAILJET_SENDER_NAME", "LALBAGH ENTERPRISE")
 
     APP_TITLE     = "Inventory Management System"
     COMPANY_NAME  = "LALBAGH ENTERPRISE"
@@ -57,3 +73,4 @@ config = {
     "production":  ProductionConfig,
     "default":     DevelopmentConfig,
 }
+ADMIN_REPORT_EMAIL = os.getenv("ADMIN_REPORT_EMAIL", "pritamardhan99@gmail.com")

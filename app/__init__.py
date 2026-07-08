@@ -1,7 +1,7 @@
 import os
 from flask import Flask
 from config.settings import config
-from .extensions import db, migrate, login_manager, mail, csrf
+from .extensions import db, migrate, login_manager, csrf
 
 
 def create_app(env: str = "default") -> Flask:
@@ -16,7 +16,6 @@ def create_app(env: str = "default") -> Flask:
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
-    mail.init_app(app)
     csrf.init_app(app)
 
     # ── Register models (so Flask-Migrate sees them) ──────────

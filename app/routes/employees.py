@@ -2,12 +2,12 @@ from datetime import date
 from flask import (Blueprint, render_template, request,
                    jsonify, flash, redirect, url_for, current_app)
 from flask_login import login_required, current_user
-from flask_mail import Message
 
-from ..extensions import db, mail
 from ..models.user import User, Employee
 import bcrypt
 import re
+from ..extensions import db
+from ..services.mailer import send_mail
 
 employees_bp = Blueprint("employees", __name__, url_prefix="/employees")
 
@@ -168,14 +168,13 @@ def api_create_login():
     db.session.commit()
 
     try:
-        msg = Message(
+        send_mail(
             subject="Your IMS Login Credentials",
             recipients=[emp.email],
             body=(f"Welcome to Company IMS\n\n"
                   f"Username: {username}\nPassword: {password}\n\n"
                   f"Please change your password after login."),
         )
-        mail.send(msg)
     except Exception:
         pass  # Don't fail if mail is not configured
 

@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 from flask import (Blueprint, render_template, redirect, url_for,
                    request, flash, jsonify)
 from flask_login import login_user, logout_user, login_required, current_user
-from flask_mail import Message
 
-from ..extensions import db, mail
+from ..extensions import db
+from ..services.mailer import send_mail
 from ..models.user import User
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -88,12 +88,11 @@ def forgot_password():
         try:
             db.session.commit()
 
-            msg = Message(
+            send_mail(
                 subject="IMS Password Reset OTP",
                 recipients=[user.email],
                 body=f"Your OTP is: {otp}\nValid for 5 minutes."
             )
-            mail.send(msg)
 
             return jsonify(success=True, message="OTP sent successfully")
 

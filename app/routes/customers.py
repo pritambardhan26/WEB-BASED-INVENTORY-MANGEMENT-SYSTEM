@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
-from flask_mail import Message
 
-from ..extensions import db, mail
+from ..extensions import db
+from ..services.mailer import send_personalized_bulk_mail
 from ..models.customer import Customer
 from ..models.sales import SalesMaster, SalesItem
 
@@ -223,7 +223,7 @@ def api_analytics(cid):
         return jsonify(success=False, message=str(e)), 500
 
 
-# ================= BULK MAIL =================
+# ================= BULK MAIL (Mailjet API) =================
 @customers_bp.route("/api/bulk-mail", methods=["POST"])
 @login_required
 def api_bulk_mail():
@@ -237,13 +237,11 @@ def api_bulk_mail():
 
         customers = Customer.query.filter(Customer.email.isnot(None)).all()
 
-        for c in customers:
-            msg = Message(
-                subject=subject,
-                recipients=[c.email],
-                body=f"Dear {c.name},\n\n{body}\n\nIMS Team"
-            )
-            mail.send(msg)
+        entries = [
+            (c.email, c.name, f"Dear {c.name},\n\n{body}\n\nIMS Team")
+            for c in customers
+        ]
+        send_personalized_bulk_mail(subject, entries)
 
         return jsonify(success=True, message="Emails sent")
 

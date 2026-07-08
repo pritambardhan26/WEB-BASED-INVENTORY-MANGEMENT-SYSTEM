@@ -3,9 +3,9 @@ from datetime import datetime, date, timedelta
 from flask import (Blueprint, render_template, request, jsonify,
                    send_file, current_app)
 from flask_login import login_required, current_user
-from flask_mail import Message
 
-from ..extensions import db, mail
+from ..extensions import db
+from ..services.mailer import send_mail
 from ..models.sales    import SalesMaster, SalesItem, Return
 from ..models.product  import Product
 from ..models.customer import Customer
@@ -269,24 +269,24 @@ def api_checkout():
         if customer_email:
             try:
                 with open(invoice_path, "rb") as f:
-                    msg = Message(
-                        subject=(
-                            f"Invoice from "
-                            f"{current_app.config.get('COMPANY_NAME', 'LALBAGH ENTERPRISE')}"
-                            f" — Rs.{grand_total:.2f}"
-                        ),
-                        recipients=[customer_email],
-                        body=(
-                            f"Dear {customer_name},\n\n"
-                            f"Thank you for shopping!\n"
-                            f"Payment: {payment_details}\n"
-                            f"Amount: Rs.{grand_total:.2f}\n\n"
-                            f"Best regards,\n"
-                            f"{current_app.config.get('COMPANY_NAME', 'LALBAGH ENTERPRISE')}"
-                        ),
-                    )
-                    msg.attach(invoice_filename, "application/pdf", f.read())
-                    mail.send(msg)
+                    pdf_bytes = f.read()
+                send_mail(
+                    subject=(
+                        f"Invoice from "
+                        f"{current_app.config.get('COMPANY_NAME', 'LALBAGH ENTERPRISE')}"
+                        f" — Rs.{grand_total:.2f}"
+                    ),
+                    recipients=[customer_email],
+                    body=(
+                        f"Dear {customer_name},\n\n"
+                        f"Thank you for shopping!\n"
+                        f"Payment: {payment_details}\n"
+                        f"Amount: Rs.{grand_total:.2f}\n\n"
+                        f"Best regards,\n"
+                        f"{current_app.config.get('COMPANY_NAME', 'LALBAGH ENTERPRISE')}"
+                    ),
+                    attachments=[(invoice_filename, "application/pdf", pdf_bytes)],
+                )
             except Exception:
                 pass   # don't fail the sale if email fails
 
