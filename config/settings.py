@@ -55,7 +55,7 @@ class Config:
     COMPANY_GSTIN = "19AAAAA0000A1ZA"
     COMPANY_PHONE = "+91 99999 00000"
     COMPANY_UPI_ID = os.getenv("COMPANY_UPI_ID", "8927770267@okbizaxis")
-    INVOICE_DIR   = os.getenv("INVOICE_DIR",   os.path.join(os.getcwd(), "invoices"))
+    INVOICE_DIR   =  os.getenv("INVOICE_DIR", "/data/invoices")
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join(os.getcwd(), "uploads"))
 
 
